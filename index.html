@@ -1306,21 +1306,80 @@
     const auth = firebase.auth();
     const db = firebase.database();
 
-    // ==================== SPIELPLAN ====================
-    const MATCHES = [
-      { id: "m1", md: 1, date: "2026-08-22T15:30:00", home: "1. FC Union Berlin", away: "VfB Stuttgart" },
-      { id: "m2", md: 2, date: "2026-08-29T15:30:00", home: "SC Freiburg", away: "1. FC Union Berlin" },
-      { id: "m3", md: 3, date: "2026-09-12T15:30:00", home: "1. FC Union Berlin", away: "Borussia Dortmund" },
-      { id: "m4", md: 4, date: "2026-09-19T18:30:00", home: "RB Leipzig", away: "1. FC Union Berlin" }
-    ];
+    // ==================== OPENLIGADB KONFIGURATION ====================
+    const OPENLIGA_URL = "https://api.openligadb.de/getmatchdata/bl1/2026/Union";
 
     // ==================== GLOBALER STATE ====================
+    let MATCHES = [];
     let currentUser = null;
     let currentDisplayName = "";
     let isAdmin = false;
     let allProfiles = {};
     let userTips = {};
     let officialResults = {};
+
+    // ==================== ADMIN SYNC MIT OPENLIGADB ====================
+    async function syncOpenLigaToFirebase(btn) {
+      if (!isAdmin) return;
+      const statusEl = document.getElementById("adminSyncStatus");
+      if (btn) btn.disabled = true;
+      if (statusEl) statusEl.textContent = "Rufe Daten von OpenLigaDB ab…";
+
+      try {
+        const resp = await fetch(OPENLIGA_URL);
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        const rawMatches = await resp.json();
+        if (!Array.isArray(rawMatches) || rawMatches.length === 0) {
+          throw new Error("Keine Spieldaten erhalten.");
+        }
+
+        // 1. Spielplan aufbereiten
+        const parsedMatches = rawMatches.map((m) => ({
+          id: "ol_" + m.matchID,
+          md: m.group?.groupOrderID || 0,
+          date: m.matchDateTimeUTC || m.matchDateTime,
+          home: m.team1?.teamName || "Heim",
+          away: m.team2?.teamName || "Gast"
+        })).sort((a, b) => a.md - b.md || new Date(a.date) - new Date(b.date));
+
+        // 2. Beendete Ergebnisse aufbereiten (resultTypeID === 2 = Endergebnis)
+        const mergedResults = { ...officialResults };
+        let newResultsCount = 0;
+
+        rawMatches.forEach((m) => {
+          if (m.matchIsFinished && Array.isArray(m.matchResults)) {
+            const finalRes = m.matchResults.find(r => r.resultTypeID === 2)
+              || m.matchResults[m.matchResults.length - 1];
+            if (finalRes && finalRes.pointsTeam1 !== null && finalRes.pointsTeam2 !== null) {
+              const id = "ol_" + m.matchID;
+              mergedResults[id] = {
+                home: Number(finalRes.pointsTeam1),
+                away: Number(finalRes.pointsTeam2)
+              };
+              newResultsCount++;
+            }
+          }
+        });
+
+        // 3. Beides atomar in Firebase speichern
+        await db.ref().update({
+          "tippspiel/matches": parsedMatches,
+          "tippspiel/results": mergedResults,
+          "tippspiel/openligaLastSync": firebase.database.ServerValue.TIMESTAMP
+        });
+
+        if (statusEl) {
+          statusEl.textContent = `✓ Synchronisiert: ${parsedMatches.length} Spiele & ${newResultsCount} Ergebnisse in Firebase gespeichert.`;
+        }
+      } catch (err) {
+        console.error("OpenLigaDB Sync Fehler:", err);
+        if (statusEl) {
+          statusEl.textContent = "Fehler beim Sync: " + err.message;
+        }
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
 
     // ==================== AUTH UI HELPER ====================
     function switchAuthTab(tab) {
@@ -1471,6 +1530,15 @@
       }
       document.getElementById("headerDisplayName").textContent = currentDisplayName;
 
+      // App liest Spielplan ausschließlich aus Firebase DB
+      db.ref("tippspiel/matches").on("value", (snap) => {
+        const val = snap.val();
+        MATCHES = Array.isArray(val) ? val : (val ? Object.values(val) : []);
+        MATCHES.sort((a, b) => a.md - b.md || new Date(a.date) - new Date(b.date));
+        renderMatches();
+        if (isAdmin) renderAdminMatches();
+      });
+
       db.ref("tippspiel/profiles").on("value", (snap) => {
         allProfiles = snap.val() || {};
         if (allProfiles[user.uid]?.displayName) {
@@ -1547,6 +1615,7 @@
       if (activeBtn) activeBtn.classList.add("active");
 
       if (viewName === "tabelle") renderLeaderboard();
+      if (viewName === "admin" && isAdmin) renderAdminMatches();
     }
 
     // ==================== SPIELE & TIPPABGABE ====================
@@ -1555,12 +1624,18 @@
     }
 
     function isUnionTeam(name) {
-      return name.toLowerCase().includes("union");
+      return (name || "").toLowerCase().includes("union");
     }
 
     function renderMatches() {
       const container = document.getElementById("matchesList");
       if (!container) return;
+
+      if (MATCHES.length === 0) {
+        container.innerHTML = `<div class="info-note">Noch kein Spielplan in der Datenbank hinterlegt. Ein Admin muss zuerst im Tab <strong>Admin</strong> mit OpenLigaDB synchronisieren.</div>`;
+        return;
+      }
+
       container.innerHTML = "";
 
       MATCHES.forEach((m) => {
@@ -1760,7 +1835,21 @@
     function renderAdminMatches() {
       const container = document.getElementById("adminMatchesList");
       if (!container || !isAdmin) return;
-      container.innerHTML = "";
+
+      container.innerHTML = `
+        <div class="plaque" style="margin-bottom: 16px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+            <div>
+              <strong>OpenLigaDB Sync</strong>
+              <div style="font-size:12px; color:var(--steel);">Aktualisiert Spielplan, Anstoßzeiten &amp; fertige Ergebnisse in Firebase.</div>
+            </div>
+            <button type="button" class="tip-save-btn" onclick="syncOpenLigaToFirebase(this)">
+              ↻ Sync starten
+            </button>
+          </div>
+          <div id="adminSyncStatus" style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ok-green); margin-top:8px;"></div>
+        </div>
+      `;
 
       MATCHES.forEach((m) => {
         const res = officialResults[m.id] || { home: "", away: "" };
