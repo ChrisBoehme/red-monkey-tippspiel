@@ -1319,18 +1319,22 @@
     let officialResults = {};
 
     // ==================== ADMIN SYNC MIT OPENLIGADB ====================
+    let lastSyncMessage = "";
+    let lastSyncIsError = false;
+
     async function syncOpenLigaToFirebase(btn) {
       if (!isAdmin) return;
-      const statusEl = document.getElementById("adminSyncStatus");
       if (btn) btn.disabled = true;
-      if (statusEl) statusEl.textContent = "Rufe Daten von OpenLigaDB ab…";
+      lastSyncIsError = false;
+      lastSyncMessage = "Rufe Daten von OpenLigaDB ab…";
+      updateSyncStatusUI();
 
       try {
         const resp = await fetch(OPENLIGA_URL);
-        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        if (!resp.ok) throw new Error("OpenLigaDB HTTP-Fehler: " + resp.status);
         const rawMatches = await resp.json();
         if (!Array.isArray(rawMatches) || rawMatches.length === 0) {
-          throw new Error("Keine Spieldaten erhalten.");
+          throw new Error("OpenLigaDB hat 0 Spiele für bl1/2026/Union zurückgegeben.");
         }
 
         // 1. Spielplan aufbereiten
@@ -1361,24 +1365,70 @@
           }
         });
 
-        // 3. Beides atomar in Firebase speichern
-        await db.ref().update({
-          "tippspiel/matches": parsedMatches,
-          "tippspiel/results": mergedResults,
-          "tippspiel/openligaLastSync": firebase.database.ServerValue.TIMESTAMP
-        });
+        // 3. Beides in Firebase speichern
+        await db.ref("tippspiel/matches").set(parsedMatches);
+        await db.ref("tippspiel/results").set(mergedResults);
+        await db.ref("tippspiel/openligaLastSync").set(firebase.database.ServerValue.TIMESTAMP);
 
-        if (statusEl) {
-          statusEl.textContent = `✓ Synchronisiert: ${parsedMatches.length} Spiele & ${newResultsCount} Ergebnisse in Firebase gespeichert.`;
-        }
+        lastSyncIsError = false;
+        lastSyncMessage = `✓ Synchronisiert: ${parsedMatches.length} Spiele & ${newResultsCount} Ergebnisse in Firebase gespeichert.`;
+        updateSyncStatusUI();
       } catch (err) {
         console.error("OpenLigaDB Sync Fehler:", err);
-        if (statusEl) {
-          statusEl.textContent = "Fehler beim Sync: " + err.message;
-        }
+        lastSyncIsError = true;
+        lastSyncMessage = "Fehler: " + (err.code || err.message);
+        updateSyncStatusUI();
       } finally {
         if (btn) btn.disabled = false;
       }
+    }
+
+    function updateSyncStatusUI() {
+      const statusEl = document.getElementById("adminSyncStatus");
+      if (!statusEl) return;
+      statusEl.style.color = lastSyncIsError ? "var(--red)" : "var(--ok-green)";
+      statusEl.textContent = lastSyncMessage;
+    }
+
+    function renderAdminMatches() {
+      const container = document.getElementById("adminMatchesList");
+      if (!container || !isAdmin) return;
+
+      container.innerHTML = `
+        <div class="plaque" style="margin-bottom: 16px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+            <div>
+              <strong>OpenLigaDB Sync</strong>
+              <div style="font-size:12px; color:var(--steel);">Aktualisiert Spielplan, Anstoßzeiten &amp; fertige Ergebnisse in Firebase.</div>
+            </div>
+            <button type="button" class="tip-save-btn" onclick="syncOpenLigaToFirebase(this)">
+              ↻ Sync starten
+            </button>
+          </div>
+          <div id="adminSyncStatus" style="font-family:'IBM Plex Mono',monospace; font-size:11px; margin-top:8px;"></div>
+        </div>
+      `;
+      updateSyncStatusUI();
+
+      MATCHES.forEach((m) => {
+        const res = officialResults[m.id] || { home: "", away: "" };
+        const card = document.createElement("div");
+        card.className = "res-plaque";
+        card.innerHTML = `
+          <div class="teams">
+            ${m.md}. SpT ·
+            <span class="${isUnionTeam(m.home) ? 'u' : ''}">${m.home}</span> :
+            <span class="${isUnionTeam(m.away) ? 'u' : ''}">${m.away}</span>
+          </div>
+          <div class="res-row">
+            <input type="number" id="adm_${m.id}_h" min="0" max="20" value="${res.home}" placeholder="–">
+            <span>:</span>
+            <input type="number" id="adm_${m.id}_a" min="0" max="20" value="${res.away}" placeholder="–">
+            <button type="button" onclick="saveAdminResult('${m.id}')">Speichern</button>
+          </div>
+        `;
+        container.appendChild(card);
+      });
     }
 
     // ==================== AUTH UI HELPER ====================
