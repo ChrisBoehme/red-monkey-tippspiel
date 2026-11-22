@@ -537,1196 +537,698 @@
 </style>
 </head>
 <body>
-<div class="app" id="app"></div>
+<!-- ==================== AUTH SCREEN ==================== -->
+<div id="authScreen" class="auth-wrapper">
+  <div class="auth-card">
+    <div class="auth-logo">⚽</div>
+    <h1 class="auth-title">Eisern getippt</h1>
+    <p class="auth-subtitle">1. FC Union Berlin Tippspiel</p>
+
+    <div class="auth-tabs">
+      <button type="button" class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">Anmelden</button>
+      <button type="button" class="auth-tab" id="tabRegister" onclick="switchAuthTab('register')">Registrieren</button>
+    </div>
+
+    <div id="authError" class="auth-msg error" style="display:none;"></div>
+    <div id="authSuccess" class="auth-msg success" style="display:none;"></div>
+
+    <!-- LOGIN FORM -->
+    <form id="loginForm" onsubmit="handleLogin(event)">
+      <div class="form-group">
+        <label for="loginEmail">E-Mail-Adresse</label>
+        <input type="email" id="loginEmail" required placeholder="deine@email.de" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label for="loginPassword">Passwort</label>
+        <input type="password" id="loginPassword" required placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn-primary auth-submit" id="btnLoginSubmit">Einloggen</button>
+      <div class="auth-links">
+        <button type="button" class="link-btn" onclick="switchAuthTab('reset')">Passwort vergessen?</button>
+      </div>
+    </form>
+
+    <!-- REGISTER FORM -->
+    <form id="registerForm" style="display:none;" onsubmit="handleRegister(event)">
+      <div class="form-group">
+        <label for="regDisplayName">Anzeigename (sichtbar in der Tabelle)</label>
+        <input type="text" id="regDisplayName" required minlength="2" maxlength="24" placeholder="z. B. EisernMax">
+      </div>
+      <div class="form-group">
+        <label for="regEmail">E-Mail-Adresse</label>
+        <input type="email" id="regEmail" required placeholder="deine@email.de" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label for="regPassword">Passwort (min. 6 Zeichen)</label>
+        <input type="password" id="regPassword" required minlength="6" placeholder="••••••••" autocomplete="new-password">
+      </div>
+      <button type="submit" class="btn-primary auth-submit" id="btnRegisterSubmit">Account erstellen</button>
+    </form>
+
+    <!-- PASSWORD RESET FORM -->
+    <form id="resetForm" style="display:none;" onsubmit="handlePasswordReset(event)">
+      <p class="auth-info">Gib deine E-Mail-Adresse ein. Wir senden dir einen Link zum Zurücksetzen deines Passworts.</p>
+      <div class="form-group">
+        <label for="resetEmail">E-Mail-Adresse</label>
+        <input type="email" id="resetEmail" required placeholder="deine@email.de">
+      </div>
+      <button type="submit" class="btn-primary auth-submit" id="btnResetSubmit">Reset-Link senden</button>
+      <div class="auth-links">
+        <button type="button" class="link-btn" onclick="switchAuthTab('login')">← Zurück zum Login</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ==================== MAIN APP ==================== -->
+<div id="appContainer" style="display:none;">
+  <header class="app-header">
+    <div class="header-left">
+      <span class="club-badge">🔴⚪</span>
+      <div>
+        <h1>Eisern getippt</h1>
+        <span class="season-label">Saison 2026/27</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="user-pill" onclick="openProfileModal()" title="Profil & Anzeigename bearbeiten">
+        <span id="headerDisplayName">Spieler</span>
+        <span class="edit-icon">✏️</span>
+      </div>
+      <button type="button" class="btn-logout" onclick="handleLogout()" title="Abmelden">Abmelden</button>
+    </div>
+  </header>
+
+  <nav class="main-nav">
+    <button class="nav-btn active" data-view="tipps" onclick="switchView('tipps')">⚽ Tipps</button>
+    <button class="nav-btn" data-view="tabelle" onclick="switchView('tabelle')">🏆 Tabelle</button>
+    <button class="nav-btn" data-view="sonder" onclick="switchView('sonder')">⭐ Sondertipps</button>
+    <button class="nav-btn" data-view="regeln" onclick="switchView('regeln')">📜 Regeln</button>
+    <button class="nav-btn admin-only" id="navAdminBtn" data-view="admin" style="display:none;" onclick="switchView('admin')">🛠️ Admin</button>
+  </nav>
+
+  <main class="content-area">
+    <!-- VIEW: TIPPS -->
+    <section id="view-tipps" class="view-section active">
+      <div class="section-header">
+        <h2>Spieltag-Tipps</h2>
+        <span id="saveStatus" class="save-badge">Bereit</span>
+      </div>
+      <div id="matchesList" class="matches-grid"></div>
+    </section>
+
+    <!-- VIEW: TABELLE -->
+    <section id="view-tabelle" class="view-section" style="display:none;">
+      <div class="section-header">
+        <h2>Gesamttabelle</h2>
+        <button type="button" class="btn-secondary" onclick="renderLeaderboard()">↻ Aktualisieren</button>
+      </div>
+      <div class="table-wrapper">
+        <table class="leaderboard-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Tipper</th>
+              <th>Spiele</th>
+              <th>Exakt</th>
+              <th>Diff.</th>
+              <th>Tendenz</th>
+              <th>Sonder</th>
+              <th>Punkte</th>
+            </tr>
+          </thead>
+          <tbody id="leaderboardBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- VIEW: SONDERTIPPS -->
+    <section id="view-sonder" class="view-section" style="display:none;">
+      <div class="section-header">
+        <h2>Sondertipps</h2>
+      </div>
+      <div class="sonder-grid">
+        <div class="card">
+          <h3>Tabellenplatz Union am Saisonende</h3>
+          <p class="hint">1 bis 18 (10 Extrapunkte bei Volltreffer)</p>
+          <input type="number" id="sonderPlatz" min="1" max="18" placeholder="z. B. 9">
+          <button type="button" class="btn-primary" onclick="saveSondertipp('sondertipp', 'sonderPlatz')">Speichern</button>
+        </div>
+        <div class="card">
+          <h3>Punkte Union nach der Hinrunde</h3>
+          <p class="hint">Nach 17 Spieltagen (8 Extrapunkte)</p>
+          <input type="number" id="sonderHinrunde" min="0" max="51" placeholder="z. B. 24">
+          <button type="button" class="btn-primary" onclick="saveSondertipp('sondertipp_hr', 'sonderHinrunde')">Speichern</button>
+        </div>
+        <div class="card">
+          <h3>Bester Union-Torschütze</h3>
+          <p class="hint">Meiste Bundesligatore der Saison (8 Extrapunkte)</p>
+          <input type="text" id="sonderTorschuetze" maxlength="40" placeholder="Nachname des Spielers">
+          <button type="button" class="btn-primary" onclick="saveSondertipp('sondertipp_ts', 'sonderTorschuetze')">Speichern</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW: REGELN -->
+    <section id="view-regeln" class="view-section" style="display:none;">
+      <div class="card rules-card">
+        <h2>Punktesystem & Regeln</h2>
+        <ul class="rules-list">
+          <li><strong>4 Punkte:</strong> Exaktes Ergebnis (z. B. Tipp 2:1, Ergebnis 2:1)</li>
+          <li><strong>3 Punkte:</strong> Richtige Tordifferenz bei Sieg/Niederlage (z. B. Tipp 2:0, Ergebnis 3:1)</li>
+          <li><strong>2 Punkte:</strong> Richtige Tendenz (Sieg, Unentschieden oder Niederlage)</li>
+          <li><strong>Tippabgabe:</strong> Bis unmittelbar vor Anpfiff des jeweiligen Spiels möglich.</li>
+          <li><strong>Anzeigename:</strong> Kann jederzeit über dein Profil oben rechts geändert werden – deine Tipps und Punkte bleiben über deine Account-ID erhalten.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- VIEW: ADMIN (Nur sichtbar wenn /admins/<uid> === true) -->
+    <section id="view-admin" class="view-section" style="display:none;">
+      <div class="section-header">
+        <h2>Ergebnisse eintragen (Admin)</h2>
+      </div>
+      <div id="adminMatchesList" class="matches-grid"></div>
+
+      <div class="card" style="margin-top: 20px;">
+        <h3>Sondertipp-Auswertung</h3>
+        <div class="form-group">
+          <label>Tatsächlicher Tabellenplatz Union</label>
+          <input type="number" id="adminSonderPlatz" min="1" max="18">
+          <button type="button" class="btn-primary" onclick="saveAdminSonder('sonderergebnis', 'adminSonderPlatz', true)">Speichern</button>
+        </div>
+        <div class="form-group">
+          <label>Tatsächliche Hinrundenpunkte</label>
+          <input type="number" id="adminSonderHinrunde" min="0" max="51">
+          <button type="button" class="btn-primary" onclick="saveAdminSonder('sonderergebnis_hr', 'adminSonderHinrunde', true)">Speichern</button>
+        </div>
+        <div class="form-group">
+          <label>Tatsächlicher Top-Torschütze</label>
+          <input type="text" id="adminSonderTorschuetze">
+          <button type="button" class="btn-primary" onclick="saveAdminSonder('sonderergebnis_ts', 'adminSonderTorschuetze', false)">Speichern</button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ==================== PROFILE / DISPLAY NAME MODAL ==================== -->
+<div id="profileModal" class="modal-backdrop" style="display:none;">
+  <div class="modal-card">
+    <h3>Profil bearbeiten</h3>
+    <p class="hint">Dein Anzeigename erscheint für alle Mitspieler in der Tabelle. Deine E-Mail-Adresse (<span id="profileEmailLabel"></span>) bleibt privat.</p>
+    <div class="form-group">
+      <label for="editDisplayNameInput">Neuer Anzeigename</label>
+      <input type="text" id="editDisplayNameInput" minlength="2" maxlength="24">
+    </div>
+    <div id="profileMsg" class="auth-msg" style="display:none;"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" onclick="closeProfileModal()">Abbrechen</button>
+      <button type="button" class="btn-primary" onclick="saveDisplayName()">Speichern</button>
+    </div>
+  </div>
+</div>
 
 <script>
-
-// === FIREBASE JSON-ADAPTER FÜR WINDOW.STORAGE ===
-const FIREBASE_DB_URL = "https://red-monkeys-tippspiel-default-rtdb.europe-west1.firebasedatabase.app/";
-
-// Bereinigt Schlüssel für Firebase-Pfade (erlaubt keine ':', '.', '#', '$', '[', ']')
-function sanitizeFirebaseKey(key) {
-  return encodeURIComponent(key).replace(/\./g, '%2E');
-}
-
-window.storage = {
-  async get(key, shared = true) {
-    const safeKey = sanitizeFirebaseKey(key);
-    const res = await fetch(`${FIREBASE_DB_URL}/tippspiel/${safeKey}.json`);
-    if (!res.ok) throw new Error("Firebase GET Fehler");
-    const data = await res.json();
-    if (data === null) return null;
-    // Gibt exakt das Format zurück, das der ursprüngliche Claude-Code erwartet
-    return { value: typeof data === 'string' ? data : JSON.stringify(data) };
-  },
-
-  async set(key, value, shared = true) {
-    const safeKey = sanitizeFirebaseKey(key);
-    const res = await fetch(`${FIREBASE_DB_URL}/tippspiel/${safeKey}.json`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(value)
-    });
-    if (!res.ok) throw new Error("Firebase SET Fehler");
-    return true;
-  }
-};
-
-(function(){
-
-  var LOGO_SRC = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAANwAAADcCAMAAAAshD+zAAABhWlDQ1BJQ0MgUHJvZmlsZQAAeJx9kT1Iw0AcxV9Ti0UqgnYQcchQnSyIioiTVLEIFkpboVUHk0u/oElDkuLiKLgWHPxYrDq4OOvq4CoIgh8gjk5Oii5S4v+SQosYD4778e7e4+4dIDQqTDW7xgFVs4xUPCZmc6ti9ysCENCPWQQlZuqJ9GIGnuPrHj6+3kV5lve5P0evkjcZ4BOJ55huWMQbxNObls55nzjMSpJCfE48ZtAFiR+5Lrv8xrnosMAzw0YmNU8cJhaLHSx3MCsZKvEUcURRNcoXsi4rnLc4q5Uaa92TvzCU11bSXKc5jDiWkEASImTUUEYFFqK0aqSYSNF+zMM/5PiT5JLJVQYjxwKqUCE5fvA/+N2tWZiccJNCMSDwYtsfI0D3LtCs2/b3sW03TwD/M3Cltf3VBjDzSXq9rUWOgL5t4OK6rcl7wOUOMPikS4bkSH6aQqEAvJ/RN+WAgVugZ83trbWP0wcgQ10t3wAHh8BokbLXPd4d7Ozt3zOt/n4Acp1yp0uZRhUAAAD/UExURf4AAP7+/f7kAPoWFPro5/nX1f8AAPg2NP8AAPkoJvd2dPi3tfhXVPnJx/aXlPdIRveIhvhoZ/iopvncBfbl1/KBffj4y/Pos/RhXfYgHvVBPfShnfTaK/XBvvLbTfPjjvHdbfLhd/L4uPhcZfnhLvbiT/TzkP8AAP8AAPJ+hPWbofS3wgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEh5WOIAAABAdFJOU/7//////3H/wP///////////////////////////////////////1W+////AAAAAAAAAAAAAAAAAAAAAAAAAACtwF/6AAAScElEQVR42u1dCXvjphaVBghFILbYEy9JZqZ9fev//39PgBYWbdaSxPOZtl+T2JI43MvdOKDsX3/8+4/ftWVP2W/cHuAe4B7gHuAe4B7gHuB+c3CywGDqO2DsG0Lygnjf9a8js7oAMGOC7AGuzPO85MzrEy6k11vFaQm1/bHowcjM9XnOM6DMNQrlSLn+FrqE0BsCqfqHiGhob4GK7cHR3DUt6mF0f2ifpO2H7quo6Z5sfuD11TkFeS7qm7GMu/7mDThihwCyVlayG8q8bSXYGpxu701xI0nXw7ofTjAOSf14lasIW/UVlBdlA6m5aQ0O1FhzXP9eNj9lGcw9dFuD8/pnxFXkXr8YRaVEHrgcGd1jTTdY3t+YDMHpsPcENbpQqWtwodraoIQ37waSeUKV7VchdopkRx4NgNMtOCtp0n1iLhP2GbUKquBCtCe43PuNe3Jx4Ao3cWCjqGIAW45adciYBp02WN1guT+pI+HjbcEVQz2EMOhTNMpGJsOXtuAAyqEqu09oe1EtpFqqzbPEtuBUT98SdVPpKKtY6P4NWoMi244je9Oyu6bGgdzcJNW3yoJsrJamx7ByZb498GbbILhyBFzuX4+csSdZGX6H+oMrMlWQ7f2ccM8B3AeXxeavx7LhYbXMqSdFguuvE1//LNzK8ze+R4M9IhTRWGzPfJCi7UMBjMKw2N9ak5J6AlQL0xOSqL+miP0Ml76V0nnJQFkPwg7gcG2Xi2hcNW0cE2zmBwlmJGxNvAYENYCdQiJf+4RnaEQTAdkbKAdRwS4K2hYccUjs/cumH7QKFFkDDvngqJa8nYio9dS1xHQtpiDsUO1NQRg2SGiwA8EI9UK1zcHVpq0OhiDuPhAZho37AQ4tb02Kao166eZZGamuJ0JE+rxP5VFkoyVge3CgGVebGDidqZCRJmgqO99qQkToGUlci46z6jIqLE4SWZbCCz7a3Ir5/kDdGJ3cBA46BNQzzArDan6TwLDVQS70Ag7uy8kaRdiOVRuiSOQsSS5EF/Zj2EU+oL3bDpm4eY4sG4vYGjPdDDCqUjbSOVziuX1Qx4lOfd1fogCg8JOCvM10nIksvQFFYC9wlFX/thG7EYENuAQtS5Ohgu6rpbE0ECJUUqqx8Y+wzpaI09TSj3QoZ56gkArTyMb6C13SYhc/l1UAKPeqA0pTPfAo5RL26EOCSW2AECWu10gr5lcvQFHdVEX5f5sy3kOByKGpoE4Lgd46ye6o+kVvSrvvC5yzJuT3BGfjAJb9ruAyzrN7Ancp0lrrqeAc7PGwDwWHOYpiQ1y4WFxk9w0OFCiKDbFEQfHlbsFhHge+XkEIZXcG7kK9+hvWMRCF8rhqdjfgBPW8L/YLQTbZFGEViNwTuAv1bAS5hvU8kNTDYHY/4Ij2e3yMq0PditHeU24HcEc/qRTpOgErk+LsvYBr0bB0hWGw3cmc436HSTkPm7WWhJ0E+crgMPLnkYD53FbU7hwV4KuCK4ISv8qXNFh8TXDBsghfhs0um389cCS0izBf3ND5q4ETK9DE7UC+FrhTvmWD+CuBK/KNm/g64DbHtrJ2siW4HbDN55rsDE7luzT+FcCd8p0aEp8OLqXQoGvBcNWEknTaQbzJk8AEG/pe8mXwyeBwjKwIzTguxqLnMuQfXjjcNFtYCQ4cwtCpT5PwdSjQuqT3C2or4nPBBUk1HfK9WPdJbaDrCubJIuSu4M64f8nJT0bRmGticUYOh0090GPESlDNT0zIRuAEb0hRiMpwtH36zFRBPKL9gVmOM8JwVho15NpS4tXgimjID7J7IPCm/2na9HQqrMlME3wcVe6SrQLH+nigMp1w8yJdu1QAy+MMnbokpSPSN28pWQ6ODxhwEkVdaLbNBueZvotFA8nggihtBBx4G01JOv4J2mP9qQg6Pxy+ykXgABpJuICnlHCfytybV7A9LYtBn+Zigwh5mvHmWUq8C7ZaM3gWKEmFtkRwruyeZrlnzs7WxbA2PuoCJZXt1GTb86YvZXFxPA9FZ827pxluSZ6H4qOVVIoJ4wNrFjDuie0wnUFWfxo1xVYDo0tB6I4Lsx+Hc605l0pgsLFNgY3RThIgNb2SMgAOxRqNiyulVB9F1XtxGKDeu9CBq2UQiVBcl6i0rXqWtAH31dHODLkZMKnpG+WMxPVteQu4Ilr0JEfazOPDEfQYUkTLqjeKCcyU5NcK3+1aWF16rFSgelJoDZmzK02AAlGpXaYEyonk6GlQ29MFXeAI25WCXDo5aVmwHkmtU09QSVHqjuiPmvEOUwngMyPngit6fQg+NdkIdVH06UKyfVsFsqDdXgpDgGakN50ks8GhHkvoR9CIM9IzZf5ShW2K4Vs1UlQX/2Wu79GCSl8lGsiI8agrfxqO63wTi/27pzqAC1qN4femGXWN06PBaLqgKP/+p23V/6xOFHg8zPW2Tsix1dmnkeUaPlCZjEapZs/8eG7au/m1ggj1FD6bJ+T5r/bSn/WlSJKxdBB2BYrDSBW3BxxIik9RdhBK7uh4+O/f6vb8Yn5/r3r695/5/8YUtM5iXl6bS19NTw+vz8+vv77n/wVjCQqLx13PAydiAcU3pv7YO309PDcdtGJ7cb8+P/8z/89U3P+judSJ7Vd96ft3yMayLxGJAs4DJ6PBMZ1AWp5ws3WHJtPzJezgzxbq8+ufejxZbL/7/MNK/Ft76d++I+JtEYowSX2DQIdjsB5wZR0VN6TwphZ5TMNJEQ9+1EHzp3/qseD1Z6DNnQJYLf2uUsnZMAwwXe8FrbtV0r7wuQfc2yXzt4tyd1W3c6gDVzv7Tm52ur1+C9pr71wXMbaDf6N2qHCPWtZB09XPY3Um5TyDUj8ZR/JMwekebIfXuIPtGKeu9NcYttcX71E85cEBTwWqGXe+KUJhsXug4hgE4c6Dfg91MsRm7V8PK49Fw9KD7T3oRF3yEHbei9RxnWdHKNck1Baui00BE3uj2aLpwfY+lJLQwMT2zDc3Uo3xauk61JZsD6kOXGaDo4nFR3YMdR5s7EaBZr0ntuTbz6HIz03WcFhCbC+Bs0XRBt8i8cpsNrgy9hzYqgIOM3sSjP5rgDTEljza3ulHMCyv/disCoowL+W+KogRPuoIOM+iSNs9HkZgwhdVOmuefw1XOZgvqudkWDxstpQto5IC9bTw2FObngOuGw2k/TDOVr9cD1s4v5LR/znC81WeF0gnnI/NjotfL7EooIz7ejO4Tvg0LrCZqcB8wSWj/56PgCs8wSVK2diSDhyMYz+mwwLgAnCtXgIcr+kYvRDdgNux/v4cuO58XHI//GH5MSRyO11xyjxlkVb2l/cGrKVThOtAYcV1txq0l39U7f3v119RWOim4PCcE0ZWz8/mi7UDqX6p/3tPzpgoRtaS3XN4/yJsLziJLj0r7kFg/hauYLk0rGkvLxOUmUoWh+Cb1Q/f3X+H6NJzzIkOPJqrs5f4hjJDpdIwTUt5zDSYS4Qd8nOz+BrRlIsGCtWKUd5Q/WoPVCCD4FgP8Xysh9lQpDredEIGYUlhtgop8G1rBYckSuHxU/FyMpCceylL8lSWKMDx5oUQlpgCnqxiocUcvLnjYp4CB0+xoV4seNv6HI/vVSQjOJP1dRit10/JXKQWJnQDbMnKKoqWu6OnvM22C3K0YD9liejQ/FVjxeYpcASG6ED64OMiW9l3s0FzEp3i0PneYnqvzNM0paCddzR5zCzR6Rm8lOFhufa7zIaJM7pm/TSDUtDwnkT66GKh4OaJjqeCq/OwE5zDEXmaQ5gITwoJRIIW+IG5ojNmsO8Mp3O7bjHBf5lgEF1avYNUsvhJeIZNHzbUhxk+7pLwTph8iwkxi+lRo5uN0AyzxyY5UEPtOqUY16lFlmliG58w8noxU3lcMcuJb8BputkMSqJA47EHHduYY+9wRj5L71TyaDmpVyvAuGz1jE0xs/iWalA3rSXWo9gIMB6jIyNINyQEj8bP5qie87CjobMW/2YyZQUfmP6Hczbsy82kIIe6bibaDMxGLMKOCx3xjYP8LMg3PiWx6qC6lj1DaRl7uE8Eh5Pz/Nr5lNpDwdqpa6eyvfbooEKuQo4OLUmLFpfZXb6R42xIuIQEYwqFm0gxpb4mnhNqDaaAeX1CJ68F+FZ/Lg8JwR3EC9W8erB78k29XUTgjia6y6fwkVqqCoSwvJ6I78+YXXXyak2VJP26qqQJu7cYSgX2BgcGiebAtjTK6SvtiVQncDMk4s0cIlXe4NI2AxdYgSs4oT7rRRir3WR5TLYRE1G81fp5TngdwJzsBmVIVCIfBK5InLSZcJCLVneI0qVjMjAqh7pFpDtDDEvKO/YJtqSaetcxWblt6XZwuC8AqY82gQhZzim8OpN2HKXYA+7SWGJYLOYENDfzyiPuGUfyIeDeBngNZyZpWXWw1A1HBvApV8va3QhYSU01jxlEaJXobgZ3mRXxu+k27Wsxnz0FwAeA04kPGGrHOXGEGL0HBvNo6BuBAyWXvLHRAIzwKtm8baenMdXVBY1z8N2deLulAQ4rJph7DkExGi24Y51t3Mc+CJycTkVnR0p4LFaEbRHspPXHgCsWqko/XjwdL5Dhq/cLv260zwwsHEa5SL8WgZNL910eb6Z14+nK68bg0FLfw9VSJcEfBQ5MblYYFLleOpDqo8Dh3uhrVi3mdvWik6sd24ITE6sAI1fe7oj1mkm3BFzD3rs5mCW3B4hyzWb/JXMua5a3bo7U0c2Ji/EF+lQusyhLN8HzReD0InBqiZ1dDe7mab7Miy/efrgUnNp3Y2AwiOyjweGFWcgSVyA+Gly24zm3fjus2fH7tGZILe1y14ZXnfmyGNxxu0OeJoZwufIvBifmlIjWNrHObC0GB9YEfXMjGrgkgt0AXLNweJsTAuBmbCvOs1kOrnk516xpZzeTUwSrZqq27Dxb8ecctbI9OPNspmbIDiuerlqWUkwefcPdGh3+BHDAvmXInFMyfEKP2es2uLANqSIjqZ9RR7nOZq04PYpaJ26IKrDnKNizKDQKTsOgmsvqH+2/6K1fgMRQhEwp+rouxlsB7lSnBfYIhWu3udpsfab+xmst4w3SxEMOaeEDBG4Ry7JMLG9Ofgo40Czn1htrYUmr5h8+MH5OAzlx5B0UoBgzRsdt7+XnNgoSnwLOlADqNzthHs+smedPEKVTQkZZOGN6XXvg3hpw9oV79XQDrOmleUHSTedqVBJ8a0WIutU9mq9z4SuPo3OrqUfQTheMCVg20oDgC/ZPhWtIWcVngWvWDPjmxxAJusVJiavAdeVZumV6cOFocWl0O3A+XXGrY89BeADeJ7506BwYyOMG2Ao4sVHm48BFTFO09vCX5Gw/9ZngIqYUPG84VKsFt/pM2WK7U8BAOWMT0IeCi8muy09fJofNj3JeDS7e1bDU6fZwfle/9WX9IdVsNtd+VCfTEBOePx9cwnBehC49S3ODtxZscTC8XG+/aS89/SuAS1jYfD02uUW/tnkZQ8xOf7tJpdItNXSbSHyrd4Sc0GKjmZyFS7daX9nu1TXRqZ7lzB4SOnxQ9NcBl8CbkwYRHh+Dv2VWuO27sCJ4aIIPFW/IKzdeNNr6LWZRyjJcWT6za/RVtPl62ObvnwPJnjdTCBNddQQQ81aJJCCBO7z4cbc3B6bRlKHWQzhQXZd7LPTt8s5HMf+8jZnH4H8hcOnUGz90Yy/ewF7vWT3r2dhklt0ZuIF3Hfg7nOrzfXF2h+AywG1JrH/+VdGjWltQ/kxwNmqEvSIs613KCGd3C84sZrCelMiKC8AtXnf1ieCyjNPE9dWHDrD9XgbwUeCaLRHsEGeyfG/20Qe+LL05wOSYfVz7wNfcF/s6tc8FZ4qAOvtdwVVOIft9wX10e4CbneoURQGIYm6zJ5Naur9Zx2ZeZJCZNxpYxyfNiw2k8+bVTyxjSqkvDc5Ye6GaEKS0xWder0QRu7IBa2IJ85bz3Sfmty8NzgDBrCmo25odUDXvjtjVe1QT1bC3AOc+gRus6uwKzpRPSAiOJuDyBhxSytYowZ2BY42S5na7cAehWXy1kiuR/RlYNjH66uBMDEJECK4lymhzVEYjVeJt6DXcPAuu/PLggA8OeuCwv0HZ/AI15XcGjusGHDUVdY/iVHoVEzvnKl8ganBQ5V8dnApODzWZtmNfOHDCYxgKP22FW1ChdgdHAsIGsjqIOnIa6rIC5o8C34IKtX/4RaTWutnI52IOUqimCIRNAFN/sQpXlCrqOjPj1WVy+3rKI7Z8gHuAe4B7gHuAe4B7gHuAe4B7gHuAe4B7gHuAe4B7gJts/webzM2IIWopjwAAAABJRU5ErkJggg==';
-
-  var ADMIN_NAME = 'Eiserner Ulf';
-
-  var UNION_SQUAD = [
-    'Ilyas Ansah', 'Tim Blaszczak', 'Dmytro Bogdanov', 'Livan Burcu', 'Oliver Burke',
-    'Julien Friedrich', 'Marvin Friedrich', 'Linus Güther', 'Janik Haberer', 'Andrej Ilić',
-    'Wooyeong Jeong', 'Josip Juranović', 'Aljoscha Kemlein', 'Rani Khedira', 'Carl Klaus',
-    'Derrick Köhn', 'Emmanuel Latte Lath', 'Marin Ljubičić', 'Andrik Markgraf', 'Stanley Nsoki',
-    'Oluwaseun Ogbemudia', 'Leopold Querfeld', 'Matheo Raab', 'Frederik Rønnow', 'Tom Rothe',
-    'András Schäfer', 'Tim Skarke', 'Robert Skov', 'Christopher Trimmel', 'Zeno Van Den Bosch'
-  ];
-
-  function keySafe(name){
-    return String(name || '').trim()
-      .replace(/[\s]+/g, '_')
-      .replace(/[\/\\'"]/g, '');
-  }
-
-  // Liest einen namensbasierten Schlüssel; falls unter dem neuen (bereinigten)
-  // Schlüssel nichts gefunden wird, schaut diese Funktion zusätzlich unter dem
-  // alten, unbereinigten Namen nach (Altdaten von vor dem keySafe-Fix) und
-  // migriert sie bei Fund automatisch auf den neuen Schlüssel.
-  async function readWithMigration(prefix, rawName){
-    var safeK = prefix + keySafe(rawName);
-    try{
-      var r = await window.storage.get(safeK, true);
-      if(r) return r.value;
-    }catch(e){}
-    if(keySafe(rawName) !== rawName){
-      try{
-        var legacyR = await window.storage.get(prefix + rawName, true);
-        if(legacyR){
-          try{ await window.storage.set(safeK, legacyR.value, true); }catch(e){}
-          return legacyR.value;
-        }
-      }catch(e){}
-    }
-    return null;
-  }
-
-  var MATCHES = [
-    {id:'md1', day:1, date:'Sa, 29.08.2026', time:'15:30', kickoff:'2026-08-29T15:30:00+02:00', home:'1. FC Union Berlin', away:'Eintracht Frankfurt', unionHome:true},
-    {id:'md2', day:2, date:'Sa, 05.09.2026', time:'15:30', kickoff:'2026-09-05T15:30:00+02:00', home:'Bayer 04 Leverkusen', away:'1. FC Union Berlin', unionHome:false},
-    {id:'md3', day:3, date:'Fr, 11.09.2026', time:'20:30', kickoff:'2026-09-11T20:30:00+02:00', home:'1. FC Union Berlin', away:'FC Schalke 04', unionHome:true},
-    {id:'md4', day:4, date:'Fr, 18.09.2026', time:'20:30', kickoff:'2026-09-18T20:30:00+02:00', home:'FC Bayern München', away:'1. FC Union Berlin', unionHome:false},
-    {id:'md5', day:5, date:'Sa, 10.10.2026', time:'tba', kickoff:null, home:'1. FC Union Berlin', away:'SV Elversberg', unionHome:true},
-    {id:'md6', day:6, date:'Sa, 17.10.2026', time:'tba', kickoff:null, home:'1. FC Union Berlin', away:'Borussia Dortmund', unionHome:true},
-    {id:'md7', day:7, date:'Sa, 24.10.2026', time:'tba', kickoff:null, home:'FC Augsburg', away:'1. FC Union Berlin', unionHome:false},
-    {id:'md8', day:8, date:'Sa, 31.10.2026', time:'tba', kickoff:null, home:'1. FC Union Berlin', away:'1. FC Köln', unionHome:true},
-    {id:'md9', day:9, date:'Sa, 07.11.2026', time:'tba', kickoff:null, home:'SC Freiburg', away:'1. FC Union Berlin', unionHome:false},
-    {id:'md10', day:10, date:'Sa, 21.11.2026', time:'tba', kickoff:null, home:'1. FC Union Berlin', away:'RB Leipzig', unionHome:true},
-    {id:'md11', day:11, date:'Sa, 28.11.2026', time:'tba', kickoff:null, home:'1. FSV Mainz 05', away:'1. FC Union Berlin', unionHome:false},
-    {id:'md12', day:12, date:'Sa, 05.12.2026', time:'tba', kickoff:null, home:'1. FC Union Berlin', away:'Hamburger SV', unionHome:true},
-    {id:'md13', day:13, date:'Sa, 12.12.2026', time:'tba', kickoff:null, home:'VfB Stuttgart', away:'1. FC Union Berlin', unionHome:false},
-    {id:'md14', day:14, date:'Sa, 19.12.2026', time:'tba', kickoff:null, home:'1. FC Union Berlin', away:'1899 Hoffenheim', unionHome:true},
-    {id:'md15', day:15, date:'Sa, 09.01.2027', time:'tba', kickoff:null, home:'SV Werder Bremen', away:'1. FC Union Berlin', unionHome:false},
-    {id:'md16', day:16, date:'Mi, 13.01.2027', time:'tba', kickoff:null, home:'1. FC Union Berlin', away:'SC Paderborn 07', unionHome:true},
-    {id:'md17', day:17, date:'Sa, 16.01.2027', time:'tba', kickoff:null, home:'Borussia Mönchengladbach', away:'1. FC Union Berlin', unionHome:false},
-    {id:'md18', day:18, date:'Sa, 23.01.2027', time:'tba', kickoff:null, home:'Eintracht Frankfurt', away:'1. FC Union Berlin', unionHome:false},
-    {id:'md19', day:19, date:'Sa, 30.01.2027', time:'tba', kickoff:null, home:'1. FC Union Berlin', away:'Bayer 04 Leverkusen', unionHome:true},
-    {id:'md20', day:20, date:'Sa, 06.02.2027', time:'tba', kickoff:null, home:'FC Schalke 04', away:'1. FC Union Berlin', unionHome:false},
-    {id:'md21', day:21, date:'Sa, 13.02.2027', time:'tba', kickoff:null, home:'1. FC Union Berlin', away:'FC Bayern München', unionHome:true},
-    {id:'md22', day:22, date:'Sa, 20.02.2027', time:'tba', kickoff:null, home:'SV Elversberg', away:'1. FC Union Berlin', unionHome:false},
-    {id:'md23', day:23, date:'Sa, 27.02.2027', time:'tba', kickoff:null, home:'Borussia Dortmund', away:'1. FC Union Berlin', unionHome:false},
-    {id:'md24', day:24, date:'Mi, 03.03.2027', time:'tba', kickoff:null, home:'1. FC Union Berlin', away:'FC Augsburg', unionHome:true},
-    {id:'md25', day:25, date:'Sa, 06.03.2027', time:'tba', kickoff:null, home:'1. FC Köln', away:'1. FC Union Berlin', unionHome:false},
-    {id:'md26', day:26, date:'Sa, 13.03.2027', time:'tba', kickoff:null, home:'1. FC Union Berlin', away:'SC Freiburg', unionHome:true},
-    {id:'md27', day:27, date:'Sa, 20.03.2027', time:'tba', kickoff:null, home:'RB Leipzig', away:'1. FC Union Berlin', unionHome:false},
-    {id:'md28', day:28, date:'Sa, 03.04.2027', time:'tba', kickoff:null, home:'1. FC Union Berlin', away:'1. FSV Mainz 05', unionHome:true},
-    {id:'md29', day:29, date:'Sa, 10.04.2027', time:'tba', kickoff:null, home:'Hamburger SV', away:'1. FC Union Berlin', unionHome:false},
-    {id:'md30', day:30, date:'Sa, 17.04.2027', time:'tba', kickoff:null, home:'1. FC Union Berlin', away:'VfB Stuttgart', unionHome:true},
-    {id:'md31', day:31, date:'Sa, 24.04.2027', time:'tba', kickoff:null, home:'1899 Hoffenheim', away:'1. FC Union Berlin', unionHome:false},
-    {id:'md32', day:32, date:'Sa, 08.05.2027', time:'tba', kickoff:null, home:'1. FC Union Berlin', away:'SV Werder Bremen', unionHome:true},
-    {id:'md33', day:33, date:'Sa, 15.05.2027', time:'tba', kickoff:null, home:'SC Paderborn 07', away:'1. FC Union Berlin', unionHome:false},
-    {id:'md34', day:34, date:'Sa, 22.05.2027', time:'15:30', kickoff:'2027-05-22T15:30:00+02:00', home:'1. FC Union Berlin', away:'Borussia Mönchengladbach', unionHome:true}
-  ];
-
-  var state = {
-    me: null,
-    players: [],
-    tips: {},        // {matchId:{h,a}}
-    results: {},      // {matchId:{h,a}}
-    allTips: {},      // {playerName: {matchId:{h,a}}}
-    sonderTipp: null,      // {platz:N} - eigener Tipp Endplatzierung
-    allSonderTipps: {},    // {playerName: {platz:N}}
-    sonderResult: null,    // {platz:N} - echte Endplatzierung
-    sonderTippHR: null,        // {platz:N} - eigener Tipp Hinrunde
-    allSonderTippsHR: {},      // {playerName: {platz:N}}
-    sonderResultHR: null,      // {platz:N} - echte Hinrunden-Platzierung
-    sonderTippTS: null,        // {player:'Name'} - eigener Torschützen-Tipp
-    allSonderTippsTS: {},      // {playerName: {player:'Name'}}
-    sonderResultTS: null,      // {player:'Name'} - echter bester Torschütze
-    tab: 'tippen',
-    loaded: false
+  // ==================== FIREBASE KONFIGURATION ====================
+  const firebaseConfig = {
+    apiKey: "DEIN_FIREBASE_API_KEY",
+    authDomain: "DEIN_PROJEKT.firebaseapp.com",
+    databaseURL: "https://union-tippspiel-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "union-tippspiel"
   };
 
-  var root = document.getElementById('app');
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.database();
 
-  function isLocked(m){
-    if(!m.kickoff) return false;
-    return new Date() >= new Date(m.kickoff);
+  // ==================== SPIELPLAN (BEISPIEL / ANPASSBAR) ====================
+  const MATCHES = [
+    { id: "m1", md: 1, date: "2026-08-22T15:30:00", home: "1. FC Union Berlin", away: "VfB Stuttgart" },
+    { id: "m2", md: 2, date: "2026-08-29T15:30:00", home: "SC Freiburg", away: "1. FC Union Berlin" },
+    { id: "m3", md: 3, date: "2026-09-12T15:30:00", home: "1. FC Union Berlin", away: "Borussia Dortmund" },
+    { id: "m4", md: 4, date: "2026-09-19T18:30:00", home: "RB Leipzig", away: "1. FC Union Berlin" }
+  ];
+
+  // ==================== GLOBALER STATE ====================
+  let currentUser = null;
+  let currentDisplayName = "";
+  let isAdmin = false;
+  let allProfiles = {};
+  let userTips = {};
+  let officialResults = {};
+  let sonderResults = { platz: null, hr: null, ts: null };
+
+  // ==================== AUTH UI HELPER ====================
+  function switchAuthTab(tab) {
+    clearAuthMessages();
+    document.getElementById("loginForm").style.display = tab === "login" ? "block" : "none";
+    document.getElementById("registerForm").style.display = tab === "register" ? "block" : "none";
+    document.getElementById("resetForm").style.display = tab === "reset" ? "block" : "none";
+
+    document.getElementById("tabLogin").classList.toggle("active", tab === "login");
+    document.getElementById("tabRegister").classList.toggle("active", tab === "register");
   }
 
-  function isSeasonLocked(){
-    var first = MATCHES[0];
-    return isLocked(first);
+  function clearAuthMessages() {
+    const err = document.getElementById("authError");
+    const suc = document.getElementById("authSuccess");
+    err.style.display = "none";
+    suc.style.display = "none";
   }
 
-  function isMatchOver(m){
-    if(!m.kickoff) return false;
-    var end = new Date(m.kickoff).getTime() + 135*60*1000;
-    return Date.now() >= end;
+  function showAuthError(msg) {
+    const err = document.getElementById("authError");
+    err.textContent = msg;
+    err.style.display = "block";
+    document.getElementById("authSuccess").style.display = "none";
   }
 
-  function isSeasonOver(){
-    return isMatchOver(MATCHES[MATCHES.length - 1]);
+  function showAuthSuccess(msg) {
+    const suc = document.getElementById("authSuccess");
+    suc.textContent = msg;
+    suc.style.display = "block";
+    document.getElementById("authError").style.display = "none";
   }
 
-  function isMatchOverByDateFallback(m){
-    if(m.kickoff) return isMatchOver(m);
-    var mt = m.date.match(/(\d{2})\.(\d{2})\.(\d{4})/);
-    if(!mt) return false;
-    var end = new Date(parseInt(mt[3],10), parseInt(mt[2],10)-1, parseInt(mt[1],10), 23, 59, 59).getTime();
-    return Date.now() >= end;
-  }
-
-  function isHinrundeOver(){
-    var lastHinrundeMatch = MATCHES[16]; // 17. Spieltag
-    return isMatchOverByDateFallback(lastHinrundeMatch);
-  }
-
-  function calcSonderPoints(tipPlatz, resPlatz){
-    if(tipPlatz===undefined || tipPlatz===null || resPlatz===undefined || resPlatz===null) return null;
-    var diff = Math.abs(tipPlatz - resPlatz);
-    if(diff === 0) return 10;
-    return Math.max(0, 10 - 2*diff);
-  }
-
-  function calcTorschuetzePoints(tipPlayer, resPlayer){
-    if(!tipPlayer || !resPlayer) return null;
-    return tipPlayer === resPlayer ? 5 : 0;
-  }
-
-  function calcPoints(tip, res){
-    if(!tip || res===undefined || res===null) return null;
-    if(tip.h===res.h && tip.a===res.a) return 3;
-    var dt = tip.h - tip.a, dr = res.h - res.a;
-    var tt = Math.sign(dt), tr = Math.sign(dr);
-    if(tt !== tr) return 0;
-    return 1;
-  }
-  function badgeClass(p){
-    if(p===3) return 'p4'; if(p===1) return 'p2'; return 'p0';
-  }
-  function badgeLabel(p){
-    if(p===3) return 'Volltreffer · 3'; if(p===1) return 'Tendenz · 1'; return 'Niete · 0';
-  }
-
-  async function loadAll(){
-    try{
-      var meR = await window.storage.get('me', false);
-      state.me = meR ? meR.value : null;
-    }catch(e){ state.me = null; }
-
-    try{
-      var pR = await window.storage.get('players', true);
-      state.players = pR ? JSON.parse(pR.value) : [];
-    }catch(e){ state.players = []; }
-
-    try{
-      var rR = await window.storage.get('results', true);
-      state.results = rR ? JSON.parse(rR.value) : {};
-    }catch(e){ state.results = {}; }
-
-    try{
-      var srR = await window.storage.get('sonderergebnis', true);
-      state.sonderResult = srR ? JSON.parse(srR.value) : null;
-    }catch(e){ state.sonderResult = null; }
-
-    try{
-      var srHR = await window.storage.get('sonderergebnis_hr', true);
-      state.sonderResultHR = srHR ? JSON.parse(srHR.value) : null;
-    }catch(e){ state.sonderResultHR = null; }
-
-    try{
-      var srTS = await window.storage.get('sonderergebnis_ts', true);
-      state.sonderResultTS = srTS ? JSON.parse(srTS.value) : null;
-    }catch(e){ state.sonderResultTS = null; }
-
-    if(state.me){
-      await loadMyTips();
-      await loadAllTips();
-      await loadAllSonderTipps();
-    }
-    state.loaded = true;
-    render();
-  }
-
-  async function loadMyTips(){
-    try{
-      var tv = await readWithMigration('tips:', state.me);
-      state.tips = tv ? JSON.parse(tv) : {};
-    }catch(e){ state.tips = {}; }
-    try{
-      var stv = await readWithMigration('sondertipp:', state.me);
-      state.sonderTipp = stv ? JSON.parse(stv) : null;
-    }catch(e){ state.sonderTipp = null; }
-    try{
-      var stHRv = await readWithMigration('sondertipp_hr:', state.me);
-      state.sonderTippHR = stHRv ? JSON.parse(stHRv) : null;
-    }catch(e){ state.sonderTippHR = null; }
-    try{
-      var stTSv = await readWithMigration('sondertipp_ts:', state.me);
-      state.sonderTippTS = stTSv ? JSON.parse(stTSv) : null;
-    }catch(e){ state.sonderTippTS = null; }
-  }
-
-  async function refreshTabelle(){
-    try{
-      var pR = await window.storage.get('players', true);
-      state.players = pR ? JSON.parse(pR.value) : [];
-    }catch(e){ state.players = []; }
-    try{
-      var rR = await window.storage.get('results', true);
-      state.results = rR ? JSON.parse(rR.value) : {};
-    }catch(e){ state.results = {}; }
-    try{
-      var srR = await window.storage.get('sonderergebnis', true);
-      state.sonderResult = srR ? JSON.parse(srR.value) : null;
-    }catch(e){ state.sonderResult = null; }
-    try{
-      var srHR = await window.storage.get('sonderergebnis_hr', true);
-      state.sonderResultHR = srHR ? JSON.parse(srHR.value) : null;
-    }catch(e){ state.sonderResultHR = null; }
-    try{
-      var srTS = await window.storage.get('sonderergebnis_ts', true);
-      state.sonderResultTS = srTS ? JSON.parse(srTS.value) : null;
-    }catch(e){ state.sonderResultTS = null; }
-    await loadAllTips();
-    await loadAllSonderTipps();
-    render();
-  }
-
-  async function loadAllTips(){
-    var out = {};
-    for(var i=0;i<state.players.length;i++){
-      var p = state.players[i];
-      try{
-        var tv = await readWithMigration('tips:', p);
-        out[p] = tv ? JSON.parse(tv) : {};
-      }catch(e){ out[p] = {}; }
-    }
-    state.allTips = out;
-  }
-
-  async function loadAllSonderTipps(){
-    var out = {}, outHR = {}, outTS = {};
-    for(var i=0;i<state.players.length;i++){
-      var p = state.players[i];
-      try{
-        var stv = await readWithMigration('sondertipp:', p);
-        out[p] = stv ? JSON.parse(stv) : null;
-      }catch(e){ out[p] = null; }
-      try{
-        var stHRv = await readWithMigration('sondertipp_hr:', p);
-        outHR[p] = stHRv ? JSON.parse(stHRv) : null;
-      }catch(e){ outHR[p] = null; }
-      try{
-        var stTSv = await readWithMigration('sondertipp_ts:', p);
-        outTS[p] = stTSv ? JSON.parse(stTSv) : null;
-      }catch(e){ outTS[p] = null; }
-    }
-    state.allSonderTipps = out;
-    state.allSonderTippsHR = outHR;
-    state.allSonderTippsTS = outTS;
-  }
-
-  async function fetchPlayersFresh(){
-    try{
-      var pR = await window.storage.get('players', true);
-      return pR ? JSON.parse(pR.value) : [];
-    }catch(e){ return []; }
-  }
-
-  async function registerPlayer(name){
-    name = name.trim();
-    if(!name) return;
-    try{ await window.storage.set('me', name, false); }catch(e){}
-    var freshList = await fetchPlayersFresh();
-    if(freshList.indexOf(name) === -1){
-      freshList.push(name);
-      try{
-        var res = await window.storage.set('players', JSON.stringify(freshList), true);
-        state.players = res ? JSON.parse(res.value) : freshList;
-      }catch(e){ state.players = freshList; }
-    } else {
-      state.players = freshList;
-    }
-    state.me = name;
-    await loadMyTips();
-    await loadAllTips();
-    render();
-  }
-
-  async function flushPendingSaves(){
-    if(!state.me) return;
-    Object.keys(saveTimers).forEach(function(mid){ clearTimeout(saveTimers[mid]); });
-    await writeTipsWithRetry(2);
-
-    if(sonderSaveTimer){
-      clearTimeout(sonderSaveTimer); sonderSaveTimer = null;
-      if(state.sonderTipp){
-        try{
-          await window.storage.set('sondertipp:' + keySafe(state.me), JSON.stringify(state.sonderTipp), true);
-          state.allSonderTipps[state.me] = state.sonderTipp;
-        }catch(e){}
-      }
-    }
-    if(sonderSaveTimerHR){
-      clearTimeout(sonderSaveTimerHR); sonderSaveTimerHR = null;
-      if(state.sonderTippHR){
-        try{
-          await window.storage.set('sondertipp_hr:' + keySafe(state.me), JSON.stringify(state.sonderTippHR), true);
-          state.allSonderTippsHR[state.me] = state.sonderTippHR;
-        }catch(e){}
-      }
-    }
-    if(sonderSaveTimerTS){
-      clearTimeout(sonderSaveTimerTS); sonderSaveTimerTS = null;
-      if(state.sonderTippTS){
-        try{
-          await window.storage.set('sondertipp_ts:' + keySafe(state.me), JSON.stringify(state.sonderTippTS), true);
-          state.allSonderTippsTS[state.me] = state.sonderTippTS;
-        }catch(e){}
-      }
+  function mapAuthError(code) {
+    switch (code) {
+      case "auth/invalid-email": return "Bitte gib eine gültige E-Mail-Adresse ein.";
+      case "auth/user-not-found":
+      case "auth/wrong-password":
+      case "auth/invalid-credential": return "E-Mail-Adresse oder Passwort ist falsch.";
+      case "auth/email-already-in-use": return "Diese E-Mail-Adresse wird bereits verwendet.";
+      case "auth/weak-password": return "Das Passwort muss mindestens 6 Zeichen lang sein.";
+      case "auth/too-many-requests": return "Zu viele Versuche. Bitte warte kurz und versuche es erneut.";
+      default: return "Fehler bei der Anmeldung (" + code + ").";
     }
   }
 
-  async function logoutPlayer(){
-    await flushPendingSaves();
-    try{ await window.storage.delete('me', false); }catch(e){}
-    state.me = null;
-    state.tips = {};
-    render();
-  }
+  // ==================== AUTH ACTIONS ====================
+  async function handleLogin(e) {
+    e.preventDefault();
+    clearAuthMessages();
+    const email = document.getElementById("loginEmail").value.trim();
+    const password = document.getElementById("loginPassword").value;
+    const btn = document.getElementById("btnLoginSubmit");
+    btn.disabled = true;
 
-  var saveTimers = {};
-  async function writeTipsWithRetry(retriesLeft){
-    var result = null;
-    try{
-      result = await window.storage.set('tips:' + keySafe(state.me), JSON.stringify(state.tips), true);
-    }catch(e){ result = null; }
-    if(result){
-      state.allTips[state.me] = state.tips;
-      return true;
+    try {
+      await auth.signInWithEmailAndPassword(email, password);
+    } catch (err) {
+      showAuthError(mapAuthError(err.code));
+    } finally {
+      btn.disabled = false;
     }
-    if(retriesLeft > 0){
-      await new Promise(function(r){ setTimeout(r, 800); });
-      return await writeTipsWithRetry(retriesLeft - 1);
-    }
-    // Letzter Ausweg: nachlesen, ob der Schreibvorgang trotz fehlender Bestätigung angekommen ist
-    try{
-      var check = await window.storage.get('tips:' + keySafe(state.me), true);
-      if(check && check.value === JSON.stringify(state.tips)){
-        state.allTips[state.me] = state.tips;
-        return true;
-      }
-    }catch(e){}
-    return false;
   }
 
-  function queueSaveTip(matchId, h, a){
-    state.tips[matchId] = {h:h, a:a};
-    clearTimeout(saveTimers[matchId]);
-    saveTimers[matchId] = setTimeout(function(){
-      writeTipsWithRetry(2);
-    }, 400);
-  }
+  async function handleRegister(e) {
+    e.preventDefault();
+    clearAuthMessages();
+    const displayName = document.getElementById("regDisplayName").value.trim();
+    const email = document.getElementById("regEmail").value.trim();
+    const password = document.getElementById("regPassword").value;
+    const btn = document.getElementById("btnRegisterSubmit");
 
-  var sonderSaveTimer = null;
-  function queueSaveSonderTipp(platz){
-    state.sonderTipp = {platz: platz};
-    clearTimeout(sonderSaveTimer);
-    sonderSaveTimer = setTimeout(async function(){
-      try{
-        await window.storage.set('sondertipp:' + keySafe(state.me), JSON.stringify(state.sonderTipp), true);
-        state.allSonderTipps[state.me] = state.sonderTipp;
-      }catch(e){}
-    }, 400);
-  }
-
-  var sonderSaveTimerHR = null;
-  function queueSaveSonderTippHR(platz){
-    state.sonderTippHR = {platz: platz};
-    clearTimeout(sonderSaveTimerHR);
-    sonderSaveTimerHR = setTimeout(async function(){
-      try{
-        await window.storage.set('sondertipp_hr:' + keySafe(state.me), JSON.stringify(state.sonderTippHR), true);
-        state.allSonderTippsHR[state.me] = state.sonderTippHR;
-      }catch(e){}
-    }, 400);
-  }
-
-  async function saveSonderErgebnis(platz){
-    state.sonderResult = {platz: platz};
-    try{
-      await window.storage.set('sonderergebnis', JSON.stringify(state.sonderResult), true);
-    }catch(e){}
-    await loadAllSonderTipps();
-    render();
-  }
-
-  async function saveSonderErgebnisHR(platz){
-    state.sonderResultHR = {platz: platz};
-    try{
-      await window.storage.set('sonderergebnis_hr', JSON.stringify(state.sonderResultHR), true);
-    }catch(e){}
-    await loadAllSonderTipps();
-    render();
-  }
-
-  var sonderSaveTimerTS = null;
-  function queueSaveSonderTippTS(playerName){
-    state.sonderTippTS = {player: playerName};
-    clearTimeout(sonderSaveTimerTS);
-    sonderSaveTimerTS = setTimeout(async function(){
-      try{
-        await window.storage.set('sondertipp_ts:' + keySafe(state.me), JSON.stringify(state.sonderTippTS), true);
-        state.allSonderTippsTS[state.me] = state.sonderTippTS;
-      }catch(e){}
-    }, 400);
-  }
-
-  async function saveSonderErgebnisTS(playerName){
-    state.sonderResultTS = {player: playerName};
-    try{
-      await window.storage.set('sonderergebnis_ts', JSON.stringify(state.sonderResultTS), true);
-    }catch(e){}
-    await loadAllSonderTipps();
-    render();
-  }
-
-  async function removePlayer(name){
-    if(name !== state.me) return;
-    var freshList = await fetchPlayersFresh();
-    var list = freshList.filter(function(p){ return p !== name; });
-    try{
-      var res = await window.storage.set('players', JSON.stringify(list), true);
-      state.players = res ? JSON.parse(res.value) : list;
-    }catch(e){ state.players = list; }
-    try{ await window.storage.delete('tips:' + keySafe(name), true); }catch(e){}
-    try{ await window.storage.delete('sondertipp:' + keySafe(name), true); }catch(e){}
-    try{ await window.storage.delete('sondertipp_hr:' + keySafe(name), true); }catch(e){}
-    try{ await window.storage.delete('sondertipp_ts:' + keySafe(name), true); }catch(e){}
-    delete state.allTips[name];
-    delete state.allSonderTipps[name];
-    delete state.allSonderTippsHR[name];
-    delete state.allSonderTippsTS[name];
-    if(state.me === name){
-      try{ await window.storage.delete('me', false); }catch(e){}
-      state.me = null;
-      state.tips = {};
-    }
-    render();
-  }
-
-  async function saveResult(matchId, h, a){
-    state.results[matchId] = {h:h, a:a};
-    try{
-      await window.storage.set('results', JSON.stringify(state.results), true);
-    }catch(e){}
-    await loadAllTips();
-    render();
-  }
-
-  // ---------- Rendering ----------
-  function render(){
-    if(!state.loaded){
-      root.innerHTML =
-        '<div class="loading-screen">' +
-          '<div class="loading-logo"><img src="' + LOGO_SRC + '" alt="Red Monkeys Logo"></div>' +
-          '<div class="loading-bar"><div class="loading-bar-fill"></div></div>' +
-          '<div class="loading-text">Lade Tippspiel …</div>' +
-        '</div>';
+    if (displayName.length < 2) {
+      showAuthError("Der Anzeigename muss mindestens 2 Zeichen lang sein.");
       return;
     }
-    if(!state.me){
-      renderOnboarding();
+
+    btn.disabled = true;
+    try {
+      const cred = await auth.createUserWithEmailAndPassword(email, password);
+      await cred.user.updateProfile({ displayName });
+      await db.ref("tippspiel/profiles/" + cred.user.uid).set({
+        displayName: displayName,
+        updatedAt: firebase.database.ServerValue.TIMESTAMP
+      });
+    } catch (err) {
+      showAuthError(mapAuthError(err.code));
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function handlePasswordReset(e) {
+    e.preventDefault();
+    clearAuthMessages();
+    const email = document.getElementById("resetEmail").value.trim();
+    const btn = document.getElementById("btnResetSubmit");
+    btn.disabled = true;
+
+    try {
+      await auth.sendPasswordResetEmail(email);
+      showAuthSuccess("Falls ein Account existiert, wurde ein Link zum Zurücksetzen gesendet.");
+    } catch (err) {
+      showAuthError(mapAuthError(err.code));
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function handleLogout() {
+    auth.signOut();
+  }
+
+  // ==================== AUTH STATE LISTENER ====================
+  auth.onAuthStateChanged(async (user) => {
+    if (!user) {
+      currentUser = null;
+      isAdmin = false;
+      document.getElementById("authScreen").style.display = "flex";
+      document.getElementById("appContainer").style.display = "none";
       return;
     }
-    var html = '';
-    html += renderHero();
-    html += renderIdBar();
-    html += renderTabs();
-    html += '<div class="content">';
-    if(state.tab === 'tippen') html += renderTippen();
-    if(state.tab === 'tabelle') html += renderTabelle();
-    if(state.tab === 'tipps') html += renderTippsUebersicht();
-    if(state.tab === 'ergebnisse') html += renderErgebnisse();
-    html += '</div>';
-    root.innerHTML = html;
-    attachHandlers();
-  }
 
-  function renderOnboarding(){
-    root.innerHTML =
-      '<div class="hero">' +
-        '<div class="rivet tl"></div><div class="rivet tr"></div><div class="rivet bl"></div><div class="rivet br"></div>' +
-        '<div class="logo-plaque"><img src="' + LOGO_SRC + '" alt="Red Monkeys Logo"></div>' +
-        '<div class="hero-text">' +
-        '<div class="eyebrow"><span class="dot"></span>RED MONKEYS &middot; UNION BERLIN</div>' +
-        '<h1>Eisern<br><span>getippt.</span></h1>' +
-        '<p>Das Tippspiel für den Verein &ndash; jede Bundesliga-Partie der Eisernen, ein Punktekonto, eine Tabelle.</p>' +
-        '</div>' +
-      '</div>' +
-      '<div class="onboard">' +
-        '<h2>Wer tippt?</h2>' +
-        '<p>Gib deinen Namen ein, damit deine Tipps und dein Punktestand gespeichert werden.</p>' +
-        '<input id="nameInput" type="text" placeholder="z. B. Sophie" maxlength="24">' +
-        '<button id="startBtn">Eisern los</button>' +
-      '</div>';
-    document.getElementById('startBtn').onclick = function(){
-      registerPlayer(document.getElementById('nameInput').value);
-    };
-    document.getElementById('nameInput').addEventListener('keydown', function(e){
-      if(e.key === 'Enter') registerPlayer(this.value);
-    });
-  }
+    currentUser = user;
+    document.getElementById("authScreen").style.display = "none";
+    document.getElementById("appContainer").style.display = "block";
 
-  function renderHero(){
-    return '<div class="hero">' +
-        '<div class="rivet tl"></div><div class="rivet tr"></div><div class="rivet bl"></div><div class="rivet br"></div>' +
-        '<div class="logo-plaque"><img src="' + LOGO_SRC + '" alt="Red Monkeys Logo"></div>' +
-        '<div class="hero-text">' +
-        '<div class="eyebrow"><span class="dot"></span>RED MONKEYS &middot; UNION BERLIN</div>' +
-        '<h1>Eisern<br><span>getippt.</span></h1>' +
-        '<p>Alle Bundesliga-Spiele der Eisernen &ndash; tippen, vergleichen, eisern bleiben.</p>' +
-        '</div>' +
-      '</div>';
-  }
+    await initUserSession(user);
+  });
 
-  function renderIdBar(){
-    return '<div class="idbar"><span>Angemeldet als <b>' + escapeHtml(state.me) + '</b></span>' +
-      '<span class="idbar-actions"><button id="logoutBtn">abmelden</button></span></div>';
-  }
+  async function initUserSession(user) {
+    // 1. Admin-Status sicher aus /admins/<uid> prüfen
+    try {
+      const adminSnap = await db.ref("admins/" + user.uid).once("value");
+      isAdmin = adminSnap.val() === true;
+    } catch (_) {
+      isAdmin = false;
+    }
+    document.getElementById("navAdminBtn").style.display = isAdmin ? "inline-flex" : "none";
 
-  function renderTabs(){
-    function t(id,label){ return '<button class="tab' + (state.tab===id?' active':'') + '" data-tab="'+id+'">'+label+'</button>'; }
-    return '<div class="tabs">' + t('tippen','Meine Tipps') + t('tabelle','Tabelle') + t('tipps','Monkey Tipps') + t('ergebnisse','Ergebnisse') + '</div>';
-  }
-
-  function renderSonderTippCard(opts){
-    var myTip = opts.myTip;
-    var res = opts.res;
-    var locked = !res && opts.isLockedFn();
-    var pts = res ? calcSonderPoints(myTip ? myTip.platz : null, res.platz) : null;
-
-    var html = '<div class="sonder-card">';
-    html += '<div class="sonder-badge">Sondertipp</div>';
-    html += '<div class="sonder-title">' + opts.title + '</div>';
-    html += '<div class="sonder-sub">' + opts.sub + ' &middot; Volltreffer = 10 Punkte, je Platz Abweichung &minus;2 Punkte</div>';
-
-    if(res){
-      var badge = pts===null ? '' : '<span class="badge ' + (pts>=10?'p4':(pts>0?'p2':'p0')) + '">' + pts + ' Pkt.</span>';
-      html += '<div class="result-final">' +
-        '<div class="score">' + res.platz + '.</div>' +
-        (myTip ? '<div class="yourtip">dein Tipp<br>' + myTip.platz + '.</div>' : '<div class="yourtip">kein Tipp<br>abgegeben</div>') +
-        badge +
-      '</div>';
-    } else if(locked){
-      html += '<div class="locked-row">' +
-        '<div class="locked-msg">🔒 ' + opts.lockedMsg + '</div>' +
-        (myTip ? '<div class="locked-tip">dein Tipp war Platz ' + myTip.platz + '</div>' : '<div class="locked-tip">kein Tipp abgegeben</div>') +
-      '</div>';
+    // 2. Profil laden oder initial anlegen
+    const profileRef = db.ref("tippspiel/profiles/" + user.uid);
+    const profileSnap = await profileRef.once("value");
+    if (profileSnap.exists() && profileSnap.val().displayName) {
+      currentDisplayName = profileSnap.val().displayName;
     } else {
-      html += '<div class="sonder-select-row">' +
-        '<select id="' + opts.selectId + '">' +
-        '<option value="">Platz wählen …</option>' +
-        Array.from({length:18}, function(_, i){ return i+1; }).map(function(n){
-          return '<option value="' + n + '"' + (myTip && myTip.platz===n ? ' selected' : '') + '>' + n + '. Platz</option>';
-        }).join('') +
-        '</select>' +
-      '</div>';
-    }
-    html += '</div>';
-    return html;
-  }
-
-  function renderSonderTippCardSeason(){
-    return renderSonderTippCard({
-      myTip: state.sonderTipp,
-      res: state.sonderResult,
-      isLockedFn: isSeasonLocked,
-      title: 'Endplatzierung Union Berlin',
-      sub: 'Saison 2026/27',
-      lockedMsg: 'Saison hat begonnen &middot; Sondertipp gesperrt',
-      selectId: 'sonderSelect'
-    });
-  }
-
-  function renderSonderTippCardHR(){
-    return renderSonderTippCard({
-      myTip: state.sonderTippHR,
-      res: state.sonderResultHR,
-      isLockedFn: isSeasonLocked,
-      title: 'Platzierung nach der Hinrunde',
-      sub: 'Stand nach dem 17. Spieltag',
-      lockedMsg: 'Saison hat begonnen &middot; Sondertipp gesperrt',
-      selectId: 'sonderSelectHR'
-    });
-  }
-
-  function renderSonderTippCardTS(){
-    var myTip = state.sonderTippTS;
-    var res = state.sonderResultTS;
-    var locked = !res && isSeasonLocked();
-    var pts = res ? calcTorschuetzePoints(myTip ? myTip.player : null, res.player) : null;
-
-    var html = '<div class="sonder-card">';
-    html += '<div class="sonder-badge">Sondertipp</div>';
-    html += '<div class="sonder-title">Bester Torschütze der Saison</div>';
-    html += '<div class="sonder-sub">Kader 26/27 inkl. Leihspieler &middot; richtiger Name = 5 Punkte</div>';
-
-    if(res){
-      var badge = pts===null ? '' : '<span class="badge ' + (pts>=5?'p4':'p0') + '">' + pts + ' Pkt.</span>';
-      html += '<div class="result-final">' +
-        '<div class="score" style="font-size:17px;">' + escapeHtml(res.player) + '</div>' +
-        (myTip ? '<div class="yourtip">dein Tipp<br>' + escapeHtml(myTip.player) + '</div>' : '<div class="yourtip">kein Tipp<br>abgegeben</div>') +
-        badge +
-      '</div>';
-    } else if(locked){
-      html += '<div class="locked-row">' +
-        '<div class="locked-msg">🔒 Saison hat begonnen &middot; Sondertipp gesperrt</div>' +
-        (myTip ? '<div class="locked-tip">dein Tipp war ' + escapeHtml(myTip.player) + '</div>' : '<div class="locked-tip">kein Tipp abgegeben</div>') +
-      '</div>';
-    } else {
-      html += '<div class="sonder-select-row">' +
-        '<select id="sonderSelectTS">' +
-        '<option value="">Spieler wählen …</option>' +
-        UNION_SQUAD.map(function(name){
-          return '<option value="' + escapeHtml(name) + '"' + (myTip && myTip.player===name ? ' selected' : '') + '>' + escapeHtml(name) + '</option>';
-        }).join('') +
-        '</select>' +
-      '</div>';
-    }
-    html += '</div>';
-    return html;
-  }
-
-  function renderTippen(){
-    var html = renderSonderTippCardSeason();
-    html += renderSonderTippCardHR();
-    html += renderSonderTippCardTS();
-    html += '<div class="points-legend">' +
-      '<div><span class="sw" style="background:var(--rust)"></span>3 · Volltreffer</div>' +
-      '<div><span class="sw" style="background:var(--iron-soft)"></span>1 · Tendenz</div>' +
-      '<div><span class="sw" style="background:var(--steel-line)"></span>0 · Niete</div>' +
-    '</div>';
-
-    var lastDay = null;
-    MATCHES.forEach(function(m){
-      if(m.day !== lastDay){
-        html += '<div class="spieltag-label">' + m.day + '. Spieltag</div>';
-        lastDay = m.day;
-      }
-      var tip = state.tips[m.id];
-      var res = state.results[m.id];
-      var pts = res ? calcPoints(tip, res) : null;
-      var rivetCls = 'rivet-status' + (pts===3 ? ' hit' : (tip ? ' set' : ''));
-
-      html += '<div class="plaque">';
-      html += '<div class="' + rivetCls + '"></div>';
-      html += '<div class="meta"><span>' + m.date + '</span><span>' + m.time + ' Uhr</span></div>';
-      html += '<div class="teams">';
-      html += '<div class="team' + (m.unionHome?' union':'') + '">' + m.home + '</div>';
-      html += '<div class="vs">vs</div>';
-      html += '<div class="team away-align' + (!m.unionHome?' union':'') + '">' + m.away + '</div>';
-      html += '</div>';
-
-      if(res){
-        var badge = pts===null ? '' : '<span class="badge ' + badgeClass(pts) + '">' + badgeLabel(pts) + '</span>';
-        html += '<div class="result-final">' +
-          '<div class="score">' + res.h + ' : ' + res.a + '</div>' +
-          (tip ? '<div class="yourtip">dein Tipp<br>' + tip.h + ':' + tip.a + '</div>' : '<div class="yourtip">kein Tipp<br>abgegeben</div>') +
-          badge +
-        '</div>';
-      } else if(isLocked(m)){
-        html += '<div class="locked-row">' +
-          '<div class="locked-msg">🔒 Tipp-Fenster geschlossen &middot; Anstoß war um ' + m.time + ' Uhr</div>' +
-          (tip ? '<div class="locked-tip">dein Tipp war ' + tip.h + ':' + tip.a + '</div>' : '<div class="locked-tip">kein Tipp abgegeben</div>') +
-        '</div>';
-      } else {
-        html += '<div class="score-row">' +
-          '<input type="number" min="0" max="20" inputmode="numeric" data-match="' + m.id + '" data-side="h" value="' + (tip? tip.h : '') + '">' +
-          '<span class="colon">:</span>' +
-          '<input type="number" min="0" max="20" inputmode="numeric" data-match="' + m.id + '" data-side="a" value="' + (tip? tip.a : '') + '">' +
-          '<button class="tip-save-btn" data-save-tip="' + m.id + '">Speichern</button>' +
-        '</div>';
-      }
-      html += '</div>';
-    });
-    return html;
-  }
-
-  function renderTabelle(){
-    var refreshBtn = '<div class="tabelle-refresh"><button id="refreshTabelleBtn">↻ Aktualisieren</button></div>';
-    if(state.players.length === 0){
-      return refreshBtn + '<div class="board"><div class="board-empty">Noch keine Teilnehmer. Sobald jemand tippt, erscheint hier die Tabelle.</div></div>';
-    }
-    var rows = state.players.map(function(p){
-      var tips = state.allTips[p] || {};
-      var total = 0, hits = 0, evaluated = 0;
-      MATCHES.forEach(function(m){
-        var res = state.results[m.id];
-        if(!res) return;
-        var pts = calcPoints(tips[m.id], res);
-        if(pts !== null){ total += pts; evaluated++; if(pts===3) hits++; }
+      currentDisplayName = user.displayName || user.email.split("@")[0];
+      await profileRef.set({
+        displayName: currentDisplayName,
+        updatedAt: firebase.database.ServerValue.TIMESTAMP
       });
-      if(state.sonderResult){
-        var sTip = state.allSonderTipps[p];
-        var sPts = calcSonderPoints(sTip ? sTip.platz : null, state.sonderResult.platz);
-        if(sPts !== null) total += sPts;
-      }
-      if(state.sonderResultHR){
-        var sTipHR = state.allSonderTippsHR[p];
-        var sPtsHR = calcSonderPoints(sTipHR ? sTipHR.platz : null, state.sonderResultHR.platz);
-        if(sPtsHR !== null) total += sPtsHR;
-      }
-      if(state.sonderResultTS){
-        var sTipTS = state.allSonderTippsTS[p];
-        var sPtsTS = calcTorschuetzePoints(sTipTS ? sTipTS.player : null, state.sonderResultTS.player);
-        if(sPtsTS !== null) total += sPtsTS;
-      }
-      return {name:p, total:total, hits:hits};
-    });
-    rows.sort(function(a,b){ return b.total - a.total || b.hits - a.hits || a.name.localeCompare(b.name); });
+    }
+    document.getElementById("headerDisplayName").textContent = currentDisplayName;
 
-    var html = refreshBtn + '<div class="board">' +
-      '<div class="board-head"><span>#</span><span>Name</span><span style="text-align:center">Pkt.</span><span style="text-align:center">3er</span></div>';
-    rows.forEach(function(r, i){
-      html += '<div class="board-row' + (i===0?' rank1':'') + '">' +
-        '<div class="rank">' + (i+1) + '</div>' +
-        '<div class="name' + (r.name===state.me?' me':'') + '">' + escapeHtml(r.name) + '</div>' +
-        '<div class="pts">' + r.total + '</div>' +
-        '<div class="hits">' + r.hits + '</div>' +
-        (r.name===state.me ? '<div class="rm"><button data-remove="' + escapeHtml(r.name) + '">ENTFERNEN</button></div>' : '') +
-      '</div>';
+    // 3. Echtzeit-Listener für Profile, Ergebnisse und eigene Tipps starten
+    db.ref("tippspiel/profiles").on("value", (snap) => {
+      allProfiles = snap.val() || {};
+      if (allProfiles[user.uid]?.displayName) {
+        currentDisplayName = allProfiles[user.uid].displayName;
+        document.getElementById("headerDisplayName").textContent = currentDisplayName;
+      }
+      renderLeaderboard();
     });
-    html += '</div>';
-    return html;
+
+    db.ref("tippspiel/results").on("value", (snap) => {
+      officialResults = snap.val() || {};
+      renderMatches();
+      if (isAdmin) renderAdminMatches();
+      renderLeaderboard();
+    });
+
+    db.ref("tippspiel/tips:" + user.uid).on("value", (snap) => {
+      userTips = snap.val() || {};
+      renderMatches();
+    });
+
+    // Sondertipps des Nutzers laden
+    loadUserSondertipps(user.uid);
+    if (isAdmin) loadAdminSonderResults();
   }
 
-  function renderTippsUebersicht(){
-    var refreshBtn = '<div class="tabelle-refresh"><button id="refreshTippsBtn">↻ Aktualisieren</button></div>';
-    if(state.players.length === 0){
-      return refreshBtn + '<div class="board"><div class="board-empty">Noch keine Teilnehmer.</div></div>';
-    }
-    var html = refreshBtn + '<div class="info-note">Aus Fairness-Gründen werden Tipps erst sichtbar, sobald das jeweilige Spiel angepfiffen wurde.</div>';
+  // ==================== PROFIL / ANZEIGENAME BEARBEITEN ====================
+  function openProfileModal() {
+    document.getElementById("profileEmailLabel").textContent = currentUser?.email || "";
+    document.getElementById("editDisplayNameInput").value = currentDisplayName;
+    document.getElementById("profileMsg").style.display = "none";
+    document.getElementById("profileModal").style.display = "flex";
+  }
 
-    var sonderRevealed = !!state.sonderResult || isSeasonLocked();
-    html += '<div class="spieltag-label">Sondertipp &middot; Endplatzierung</div>';
-    html += '<div class="plaque">';
-    html += '<div class="teams"><div class="team union">1. FC Union Berlin &middot; Saison 26/27</div></div>';
-    if(!sonderRevealed){
-      html += '<div class="locked-row"><div class="locked-msg">🔒 Tipps noch verborgen &middot; sichtbar ab Saisonstart</div></div>';
-    } else {
-      html += '<div class="tipps-list">';
-      state.players.slice().sort(function(a,b){ return a.localeCompare(b); }).forEach(function(p){
-        var sTip = state.allSonderTipps[p];
-        var sPts = state.sonderResult ? calcSonderPoints(sTip ? sTip.platz : null, state.sonderResult.platz) : null;
-        html += '<div class="tipps-row' + (p===state.me?' me':'') + '">' +
-          '<span class="tipps-name">' + escapeHtml(p) + '</span>' +
-          '<span class="tipps-val">' + (sTip ? (sTip.platz + '.') : '&ndash;') + '</span>' +
-          (sPts!==null ? '<span class="badge ' + (sPts>=10?'p4':(sPts>0?'p2':'p0')) + '">' + sPts + ' Pkt.</span>' : '') +
-        '</div>';
+  function closeProfileModal() {
+    document.getElementById("profileModal").style.display = "none";
+  }
+
+  async function saveDisplayName() {
+    if (!currentUser) return;
+    const newName = document.getElementById("editDisplayNameInput").value.trim();
+    const msgEl = document.getElementById("profileMsg");
+
+    if (newName.length < 2 || newName.length > 24) {
+      msgEl.className = "auth-msg error";
+      msgEl.textContent = "Bitte wähle einen Namen zwischen 2 und 24 Zeichen.";
+      msgEl.style.display = "block";
+      return;
+    }
+
+    try {
+      await currentUser.updateProfile({ displayName: newName });
+      await db.ref("tippspiel/profiles/" + currentUser.uid).update({
+        displayName: newName,
+        updatedAt: firebase.database.ServerValue.TIMESTAMP
       });
-      html += '</div>';
+      currentDisplayName = newName;
+      document.getElementById("headerDisplayName").textContent = newName;
+      closeProfileModal();
+    } catch (err) {
+      msgEl.className = "auth-msg error";
+      msgEl.textContent = "Fehler beim Speichern: " + err.message;
+      msgEl.style.display = "block";
     }
-    html += '</div>';
+  }
 
-    html += '<div class="spieltag-label">Sondertipp &middot; Hinrunde</div>';
-    html += '<div class="plaque">';
-    html += '<div class="teams"><div class="team union">1. FC Union Berlin &middot; nach dem 17. Spieltag</div></div>';
-    if(!sonderRevealed){
-      html += '<div class="locked-row"><div class="locked-msg">🔒 Tipps noch verborgen &middot; sichtbar ab Saisonstart</div></div>';
-    } else {
-      html += '<div class="tipps-list">';
-      state.players.slice().sort(function(a,b){ return a.localeCompare(b); }).forEach(function(p){
-        var sTipHR = state.allSonderTippsHR[p];
-        var sPtsHR = state.sonderResultHR ? calcSonderPoints(sTipHR ? sTipHR.platz : null, state.sonderResultHR.platz) : null;
-        html += '<div class="tipps-row' + (p===state.me?' me':'') + '">' +
-          '<span class="tipps-name">' + escapeHtml(p) + '</span>' +
-          '<span class="tipps-val">' + (sTipHR ? (sTipHR.platz + '.') : '&ndash;') + '</span>' +
-          (sPtsHR!==null ? '<span class="badge ' + (sPtsHR>=10?'p4':(sPtsHR>0?'p2':'p0')) + '">' + sPtsHR + ' Pkt.</span>' : '') +
-        '</div>';
+  // ==================== NAVIGATION ====================
+  function switchView(viewName) {
+    document.querySelectorAll(".view-section").forEach(sec => sec.style.display = "none");
+    document.querySelectorAll(".nav-btn").forEach(btn => btn.classList.remove("active"));
+
+    const target = document.getElementById("view-" + viewName);
+    if (target) target.style.display = "block";
+    const activeBtn = document.querySelector(`.nav-btn[data-view="${viewName}"]`);
+    if (activeBtn) activeBtn.classList.add("active");
+
+    if (viewName === "tabelle") renderLeaderboard();
+  }
+
+  // ==================== SPIELE & TIPPABGABE (UID-BASIERT) ====================
+  function isMatchLocked(dateIso) {
+    return Date.now() >= new Date(dateIso).getTime();
+  }
+
+  function renderMatches() {
+    const container = document.getElementById("matchesList");
+    if (!container) return;
+    container.innerHTML = "";
+
+    MATCHES.forEach((m) => {
+      const locked = isMatchLocked(m.date);
+      const tip = userTips[m.id] || { home: "", away: "" };
+      const res = officialResults[m.id];
+      const pts = (res && tip.home !== "" && tip.away !== "") ? calculatePoints(tip, res) : null;
+
+      const card = document.createElement("div");
+      card.className = "card match-card" + (locked ? " locked" : "");
+      card.innerHTML = `
+        <div class="match-meta">
+          <span>Spieltag ${m.md} · ${new Date(m.date).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })} Uhr</span>
+          ${locked ? '<span class="badge-locked">🔒 Gesperrt</span>' : '<span class="badge-open">Offen</span>'}
+        </div>
+        <div class="match-teams">
+          <span class="team home">${m.home}</span>
+          <div class="tip-inputs">
+            <input type="number" min="0" max="20" value="${tip.home}" ${locked ? "disabled" : ""}
+              onchange="saveTip('${m.id}', 'home', this.value)">
+            <span>:</span>
+            <input type="number" min="0" max="20" value="${tip.away}" ${locked ? "disabled" : ""}
+              onchange="saveTip('${m.id}', 'away', this.value)">
+          </div>
+          <span class="team away">${m.away}</span>
+        </div>
+        ${res ? `<div class="match-result">Ergebnis: <strong>${res.home}:${res.away}</strong> ${pts !== null ? `· Deine Punkte: <strong>+${pts}</strong>` : ""}</div>` : ""}
+      `;
+      container.appendChild(card);
+    });
+  }
+
+  async function saveTip(matchId, side, rawVal) {
+    if (!currentUser) return;
+    const match = MATCHES.find(m => m.id === matchId);
+    if (!match || isMatchLocked(match.date)) return;
+
+    const val = rawVal === "" ? "" : Math.max(0, Math.min(20, parseInt(rawVal, 10)));
+    const existing = userTips[matchId] || { home: "", away: "" };
+    const updated = { ...existing, [side]: isNaN(val) ? "" : val };
+
+    const statusEl = document.getElementById("saveStatus");
+    statusEl.textContent = "Speichert…";
+
+    try {
+      await db.ref(`tippspiel/tips:${currentUser.uid}/${matchId}`).set(updated);
+      statusEl.textContent = "Gespeichert ✓";
+    } catch (err) {
+      statusEl.textContent = "Fehler!";
+      console.error(err);
+    }
+  }
+
+  // ==================== SONDERTIPPS ====================
+  async function loadUserSondertipps(uid) {
+    const [pSnap, hrSnap, tsSnap] = await Promise.all([
+      db.ref("tippspiel/sondertipp:" + uid).once("value"),
+      db.ref("tippspiel/sondertipp_hr:" + uid).once("value"),
+      db.ref("tippspiel/sondertipp_ts:" + uid).once("value")
+    ]);
+    if (pSnap.exists()) document.getElementById("sonderPlatz").value = pSnap.val();
+    if (hrSnap.exists()) document.getElementById("sonderHinrunde").value = hrSnap.val();
+    if (tsSnap.exists()) document.getElementById("sonderTorschuetze").value = tsSnap.val();
+  }
+
+  async function saveSondertipp(prefix, inputId) {
+    if (!currentUser) return;
+    const val = document.getElementById(inputId).value.trim();
+    if (!val) return;
+    await db.ref(`tippspiel/${prefix}:${currentUser.uid}`).set(val);
+    alert("Sondertipp gespeichert!");
+  }
+
+  // ==================== PUNKTEBERECHNUNG & RANGLISTE ====================
+  function calculatePoints(tip, res) {
+    const th = Number(tip.home), ta = Number(tip.away);
+    const rh = Number(res.home), ra = Number(res.away);
+    if (isNaN(th) || isNaN(ta) || isNaN(rh) || isNaN(ra)) return 0;
+
+    if (th === rh && ta === ra) return 4; // Exakt
+    const tipDiff = th - ta;
+    const resDiff = rh - ra;
+    if (Math.sign(tipDiff) === Math.sign(resDiff)) {
+      if (tipDiff === resDiff && tipDiff !== 0) return 3; // Richtige Differenz
+      return 2; // Richtige Tendenz
+    }
+    return 0;
+  }
+
+  async function renderLeaderboard() {
+    const tbody = document.getElementById("leaderboardBody");
+    if (!tbody) return;
+
+    const rootSnap = await db.ref("tippspiel").once("value");
+    const rootData = rootSnap.val() || {};
+    const profiles = rootData.profiles || allProfiles || {};
+    const results = rootData.results || officialResults || {};
+
+    const sPlatz = rootData.sonderergebnis;
+    const sHr = rootData.sonderergebnis_hr;
+    const sTs = (rootData.sonderergebnis_ts || "").toString().trim().toLowerCase();
+
+    const rows = Object.keys(profiles).map((uid) => {
+      const name = profiles[uid]?.displayName || "Unbekannt";
+      const tips = rootData["tips:" + uid] || {};
+      let exact = 0, diff = 0, tend = 0, tippedCount = 0, total = 0;
+
+      Object.keys(results).forEach((mId) => {
+        const res = results[mId];
+        const tip = tips[mId];
+        if (!res || !tip || tip.home === "" || tip.away === "") return;
+        tippedCount++;
+        const pts = calculatePoints(tip, res);
+        total += pts;
+        if (pts === 4) exact++;
+        else if (pts === 3) diff++;
+        else if (pts === 2) tend++;
       });
-      html += '</div>';
-    }
-    html += '</div>';
 
-    html += '<div class="spieltag-label">Sondertipp &middot; Torschütze</div>';
-    html += '<div class="plaque">';
-    html += '<div class="teams"><div class="team union">Bester Torschütze der Saison</div></div>';
-    if(!sonderRevealed){
-      html += '<div class="locked-row"><div class="locked-msg">🔒 Tipps noch verborgen &middot; sichtbar ab Saisonstart</div></div>';
+      let sonderPts = 0;
+      if (sPlatz && Number(rootData["sondertipp:" + uid]) === Number(sPlatz)) sonderPts += 10;
+      if (sHr && Number(rootData["sondertipp_hr:" + uid]) === Number(sHr)) sonderPts += 8;
+      if (sTs && (rootData["sondertipp_ts:" + uid] || "").toString().trim().toLowerCase() === sTs) sonderPts += 8;
+      total += sonderPts;
+
+      return { uid, name, tippedCount, exact, diff, tend, sonderPts, total };
+    });
+
+    rows.sort((a, b) => b.total - a.total || b.exact - a.exact || a.name.localeCompare(b.name));
+
+    tbody.innerHTML = rows.map((r, idx) => `
+      <tr class="${r.uid === currentUser?.uid ? 'highlight-me' : ''}">
+        <td>${idx + 1}</td>
+        <td><strong>${escapeHtml(r.name)}</strong></td>
+        <td>${r.tippedCount}</td>
+        <td>${r.exact}</td>
+        <td>${r.diff}</td>
+        <td>${r.tend}</td>
+        <td>${r.sonderPts}</td>
+        <td><strong>${r.total}</strong></td>
+      </tr>
+    `).join("");
+  }
+
+  // ==================== ADMIN BEREICH ====================
+  function renderAdminMatches() {
+    const container = document.getElementById("adminMatchesList");
+    if (!container || !isAdmin) return;
+    container.innerHTML = "";
+
+    MATCHES.forEach((m) => {
+      const res = officialResults[m.id] || { home: "", away: "" };
+      const card = document.createElement("div");
+      card.className = "card match-card";
+      card.innerHTML = `
+        <div class="match-meta"><span>Spieltag ${m.md} · ${m.home} vs. ${m.away}</span></div>
+        <div class="match-teams">
+          <span class="team home">${m.home}</span>
+          <div class="tip-inputs">
+            <input type="number" id="adm_${m.id}_h" min="0" max="20" value="${res.home}">
+            <span>:</span>
+            <input type="number" id="adm_${m.id}_a" min="0" max="20" value="${res.away}">
+          </div>
+          <button type="button" class="btn-primary" onclick="saveAdminResult('${m.id}')">Speichern</button>
+        </div>
+      `;
+      container.appendChild(card);
+    });
+  }
+
+  async function saveAdminResult(matchId) {
+    if (!isAdmin) return;
+    const h = document.getElementById(`adm_${matchId}_h`).value;
+    const a = document.getElementById(`adm_${matchId}_a`).value;
+    if (h === "" || a === "") {
+      await db.ref("tippspiel/results/" + matchId).remove();
     } else {
-      html += '<div class="tipps-list">';
-      state.players.slice().sort(function(a,b){ return a.localeCompare(b); }).forEach(function(p){
-        var sTipTS = state.allSonderTippsTS[p];
-        var sPtsTS = state.sonderResultTS ? calcTorschuetzePoints(sTipTS ? sTipTS.player : null, state.sonderResultTS.player) : null;
-        html += '<div class="tipps-row' + (p===state.me?' me':'') + '">' +
-          '<span class="tipps-name">' + escapeHtml(p) + '</span>' +
-          '<span class="tipps-val" style="font-size:11px;">' + (sTipTS ? escapeHtml(sTipTS.player) : '&ndash;') + '</span>' +
-          (sPtsTS!==null ? '<span class="badge ' + (sPtsTS>=5?'p4':'p0') + '">' + sPtsTS + ' Pkt.</span>' : '') +
-        '</div>';
+      await db.ref("tippspiel/results/" + matchId).set({
+        home: parseInt(h, 10),
+        away: parseInt(a, 10)
       });
-      html += '</div>';
     }
-    html += '</div>';
-
-    var lastDay = null;
-    MATCHES.forEach(function(m){
-      var res = state.results[m.id];
-      var revealed = !!res || isLocked(m);
-      if(m.day !== lastDay){
-        html += '<div class="spieltag-label">' + m.day + '. Spieltag</div>';
-        lastDay = m.day;
-      }
-      html += '<div class="plaque">';
-      html += '<div class="meta"><span>' + m.date + '</span><span>' + m.time + ' Uhr</span></div>';
-      html += '<div class="teams">';
-      html += '<div class="team' + (m.unionHome?' union':'') + '">' + m.home + '</div>';
-      html += '<div class="vs">vs</div>';
-      html += '<div class="team away-align' + (!m.unionHome?' union':'') + '">' + m.away + '</div>';
-      html += '</div>';
-
-      if(!revealed){
-        html += '<div class="locked-row"><div class="locked-msg">🔒 Tipps noch verborgen &middot; sichtbar ab Anstoß</div></div>';
-      } else {
-        html += '<div class="tipps-list">';
-        state.players.slice().sort(function(a,b){ return a.localeCompare(b); }).forEach(function(p){
-          var tips = state.allTips[p] || {};
-          var tip = tips[m.id];
-          var pts = res ? calcPoints(tip, res) : null;
-          html += '<div class="tipps-row' + (p===state.me?' me':'') + '">' +
-            '<span class="tipps-name">' + escapeHtml(p) + '</span>' +
-            '<span class="tipps-val">' + (tip ? (tip.h + ':' + tip.a) : '&ndash;') + '</span>' +
-            (pts!==null ? '<span class="badge ' + badgeClass(pts) + '">' + pts + ' Pkt.</span>' : '') +
-          '</div>';
-        });
-        html += '</div>';
-      }
-      html += '</div>';
-    });
-    return html;
+    alert("Ergebnis gespeichert!");
   }
 
-  function renderErgebnisse(){
-    if(state.me !== ADMIN_NAME){
-      return renderErgebnisseReadOnly();
-    }
-
-    var html = '<div class="info-note">Ergebnisse können erst eingetragen werden, sobald das jeweilige Spiel stattgefunden hat. Nach dem Speichern lassen sie sich jederzeit wieder ändern.</div>';
-
-    html += '<div class="spieltag-label">Sondertipp</div>';
-    var sr = state.sonderResult;
-    var seasonOver = isSeasonOver();
-    html += '<div class="res-plaque">';
-    html += '<div class="teams">Endplatzierung 1. FC Union Berlin &middot; Saison 26/27</div>';
-    if(!seasonOver && !sr){
-      var lastM = MATCHES[MATCHES.length - 1];
-      html += '<div class="locked-row"><div class="locked-msg">🔒 Noch nicht ermittelt &middot; Saisonende erst nach dem ' + lastM.day + '. Spieltag (' + lastM.date + ')</div></div>';
-    } else {
-      html += '<div class="res-row">' +
-        '<select id="sonderResSelect" style="flex:1; padding:8px 10px; font-family:\'IBM Plex Mono\',monospace; font-size:14px; border:1.5px solid var(--steel-line); border-radius:5px; background:#fff;">' +
-        '<option value="">Platz wählen …</option>' +
-        Array.from({length:18}, function(_, i){ return i+1; }).map(function(n){
-          return '<option value="' + n + '"' + (sr && sr.platz===n ? ' selected' : '') + '>' + n + '. Platz</option>';
-        }).join('') +
-        '</select>' +
-        '<button id="saveSonderResBtn">' + (sr ? 'Ändern' : 'Speichern') + '</button>';
-      html += '</div>';
-    }
-    html += '</div>';
-
-    html += '<div class="spieltag-label">Sondertipp Hinrunde</div>';
-    var srHR = state.sonderResultHR;
-    var hinrundeOver = isHinrundeOver();
-    html += '<div class="res-plaque">';
-    html += '<div class="teams">Platzierung nach der Hinrunde 1. FC Union Berlin</div>';
-    if(!hinrundeOver && !srHR){
-      var m17 = MATCHES[16];
-      html += '<div class="locked-row"><div class="locked-msg">🔒 Noch nicht ermittelt &middot; Hinrunde endet erst nach dem 17. Spieltag (' + m17.date + ')</div></div>';
-    } else {
-      html += '<div class="res-row">' +
-        '<select id="sonderResSelectHR" style="flex:1; padding:8px 10px; font-family:\'IBM Plex Mono\',monospace; font-size:14px; border:1.5px solid var(--steel-line); border-radius:5px; background:#fff;">' +
-        '<option value="">Platz wählen …</option>' +
-        Array.from({length:18}, function(_, i){ return i+1; }).map(function(n){
-          return '<option value="' + n + '"' + (srHR && srHR.platz===n ? ' selected' : '') + '>' + n + '. Platz</option>';
-        }).join('') +
-        '</select>' +
-        '<button id="saveSonderResHRBtn">' + (srHR ? 'Ändern' : 'Speichern') + '</button>';
-      html += '</div>';
-    }
-    html += '</div>';
-
-    html += '<div class="spieltag-label">Sondertipp Torschütze</div>';
-    var srTS = state.sonderResultTS;
-    var seasonOverTS = isSeasonOver();
-    html += '<div class="res-plaque">';
-    html += '<div class="teams">Bester Torschütze der Saison &middot; Union Berlin</div>';
-    if(!seasonOverTS && !srTS){
-      var lastMTS = MATCHES[MATCHES.length - 1];
-      html += '<div class="locked-row"><div class="locked-msg">🔒 Noch nicht ermittelt &middot; Saisonende erst nach dem ' + lastMTS.day + '. Spieltag (' + lastMTS.date + ')</div></div>';
-    } else {
-      html += '<div class="res-row">' +
-        '<select id="sonderResSelectTS" style="flex:1; padding:8px 10px; font-family:\'IBM Plex Mono\',monospace; font-size:14px; border:1.5px solid var(--steel-line); border-radius:5px; background:#fff;">' +
-        '<option value="">Spieler wählen …</option>' +
-        UNION_SQUAD.map(function(name){
-          return '<option value="' + escapeHtml(name) + '"' + (srTS && srTS.player===name ? ' selected' : '') + '>' + escapeHtml(name) + '</option>';
-        }).join('') +
-        '</select>' +
-        '<button id="saveSonderResTSBtn">' + (srTS ? 'Ändern' : 'Speichern') + '</button>';
-      html += '</div>';
-    }
-    html += '</div>';
-
-    html += '<div class="spieltag-label">Bundesliga-Spiele</div>';
-    MATCHES.forEach(function(m){
-      var res = state.results[m.id];
-      var over = isMatchOver(m);
-      html += '<div class="res-plaque">';
-      html += '<div class="teams"><span class="' + (m.unionHome?'u':'') + '">' + m.home + '</span> &ndash; <span class="' + (!m.unionHome?'u':'') + '">' + m.away + '</span></div>';
-      if(!over && !res){
-        html += '<div class="locked-row"><div class="locked-msg">🔒 Noch nicht gespielt &middot; Anstoß ' + m.date + ', ' + m.time + ' Uhr</div></div>';
-      } else {
-        html += '<div class="res-row">' +
-          '<input type="number" min="0" max="20" data-res-match="' + m.id + '" data-res-side="h" value="' + (res? res.h : '') + '">' +
-          '<span class="colon" style="font-family:\'Anton\',sans-serif;color:var(--steel)">:</span>' +
-          '<input type="number" min="0" max="20" data-res-match="' + m.id + '" data-res-side="a" value="' + (res? res.a : '') + '">' +
-          '<button data-save-res="' + m.id + '">' + (res ? 'Ändern' : 'Speichern') + '</button>';
-        html += '</div>';
-      }
-      html += '</div>';
-    });
-    return html;
+  async function loadAdminSonderResults() {
+    const [p, hr, ts] = await Promise.all([
+      db.ref("tippspiel/sonderergebnis").once("value"),
+      db.ref("tippspiel/sonderergebnis_hr").once("value"),
+      db.ref("tippspiel/sonderergebnis_ts").once("value")
+    ]);
+    if (p.exists()) document.getElementById("adminSonderPlatz").value = p.val();
+    if (hr.exists()) document.getElementById("adminSonderHinrunde").value = hr.val();
+    if (ts.exists()) document.getElementById("adminSonderTorschuetze").value = ts.val();
   }
 
-  function renderErgebnisseReadOnly(){
-    var html = '<div class="info-note">Nur <b>' + escapeHtml(ADMIN_NAME) + '</b> kann Ergebnisse eintragen oder ändern. Hier siehst du den aktuellen Stand.</div>';
-
-    html += '<div class="spieltag-label">Sondertipp</div>';
-    var sr = state.sonderResult;
-    html += '<div class="res-plaque"><div class="teams">Endplatzierung 1. FC Union Berlin &middot; Saison 26/27</div>' +
-      '<div class="result-final" style="border-top:none; margin-top:8px; padding-top:0;">' +
-      (sr ? '<div class="score">' + sr.platz + '.</div>' : '<div class="yourtip">noch offen</div>') +
-      '</div></div>';
-
-    var srHR = state.sonderResultHR;
-    html += '<div class="res-plaque"><div class="teams">Platzierung nach der Hinrunde 1. FC Union Berlin</div>' +
-      '<div class="result-final" style="border-top:none; margin-top:8px; padding-top:0;">' +
-      (srHR ? '<div class="score">' + srHR.platz + '.</div>' : '<div class="yourtip">noch offen</div>') +
-      '</div></div>';
-
-    var srTS = state.sonderResultTS;
-    html += '<div class="res-plaque"><div class="teams">Bester Torschütze der Saison &middot; Union Berlin</div>' +
-      '<div class="result-final" style="border-top:none; margin-top:8px; padding-top:0;">' +
-      (srTS ? '<div class="score" style="font-size:16px;">' + escapeHtml(srTS.player) + '</div>' : '<div class="yourtip">noch offen</div>') +
-      '</div></div>';
-
-    html += '<div class="spieltag-label">Bundesliga-Spiele</div>';
-    MATCHES.forEach(function(m){
-      var res = state.results[m.id];
-      html += '<div class="res-plaque">';
-      html += '<div class="teams"><span class="' + (m.unionHome?'u':'') + '">' + m.home + '</span> &ndash; <span class="' + (!m.unionHome?'u':'') + '">' + m.away + '</span></div>';
-      html += '<div class="result-final" style="border-top:none; margin-top:8px; padding-top:0;">' +
-        (res ? '<div class="score">' + res.h + ' : ' + res.a + '</div>' : '<div class="yourtip">noch offen</div>') +
-      '</div></div>';
-    });
-    return html;
+  async function saveAdminSonder(nodeName, inputId, asNumber) {
+    if (!isAdmin) return;
+    const raw = document.getElementById(inputId).value.trim();
+    if (!raw) return;
+    await db.ref("tippspiel/" + nodeName).set(asNumber ? Number(raw) : raw);
+    alert("Sonderergebnis gespeichert!");
   }
 
-  function escapeHtml(s){
-    return (s||'').replace(/[&<>"']/g, function(c){
-      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
-    });
+  function escapeHtml(str) {
+    return str.replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[c]));
   }
-
-  function attachHandlers(){
-    var lb = document.getElementById('logoutBtn');
-    if(lb) lb.onclick = logoutPlayer;
-
-    var sonderSelect = document.getElementById('sonderSelect');
-    if(sonderSelect){
-      sonderSelect.onchange = function(){
-        var v = this.value === '' ? null : parseInt(this.value, 10);
-        if(v !== null) queueSaveSonderTipp(v);
-      };
-    }
-    var sonderSelectHR = document.getElementById('sonderSelectHR');
-    if(sonderSelectHR){
-      sonderSelectHR.onchange = function(){
-        var v = this.value === '' ? null : parseInt(this.value, 10);
-        if(v !== null) queueSaveSonderTippHR(v);
-      };
-    }
-    var sonderSelectTS = document.getElementById('sonderSelectTS');
-    if(sonderSelectTS){
-      sonderSelectTS.onchange = function(){
-        if(this.value !== '') queueSaveSonderTippTS(this.value);
-      };
-    }
-
-    document.querySelectorAll('.tab').forEach(function(el){
-      el.onclick = function(){
-        var target = el.getAttribute('data-tab');
-        state.tab = target;
-        render();
-        if(target === 'tabelle' || target === 'tipps'){
-          refreshTabelle();
-        }
-      };
-    });
-
-    document.querySelectorAll('.score-row input').forEach(function(inp){
-      inp.addEventListener('input', function(){
-        var mid = this.getAttribute('data-match');
-        var side = this.getAttribute('data-side');
-        var row = this.closest('.score-row');
-        var hIn = row.querySelector('[data-side="h"]');
-        var aIn = row.querySelector('[data-side="a"]');
-        var h = hIn.value === '' ? null : parseInt(hIn.value,10);
-        var a = aIn.value === '' ? null : parseInt(aIn.value,10);
-        var plaque = this.closest('.plaque');
-        var rivet = plaque.querySelector('.rivet-status');
-        var btn = row.querySelector('.tip-save-btn');
-        if(h!==null && !isNaN(h) && a!==null && !isNaN(a)){
-          queueSaveTip(mid, h, a);
-          rivet.classList.add('set');
-        } else {
-          rivet.classList.remove('set');
-        }
-        if(btn){ btn.classList.remove('saved'); btn.classList.remove('error'); btn.textContent = 'Speichern'; }
-      });
-    });
-
-    document.querySelectorAll('[data-save-tip]').forEach(function(btn){
-      btn.onclick = async function(){
-        var mid = this.getAttribute('data-save-tip');
-        var row = this.closest('.score-row');
-        var hIn = row.querySelector('[data-side="h"]');
-        var aIn = row.querySelector('[data-side="a"]');
-        var h = hIn.value === '' ? NaN : parseInt(hIn.value,10);
-        var a = aIn.value === '' ? NaN : parseInt(aIn.value,10);
-        if(isNaN(h) || isNaN(a)){ hIn.focus(); return; }
-        clearTimeout(saveTimers[mid]);
-        state.tips[mid] = {h:h, a:a};
-        this.disabled = true;
-        this.classList.remove('error'); this.classList.remove('saved');
-        this.textContent = 'Speichert …';
-        var ok = await writeTipsWithRetry(2);
-        this.disabled = false;
-        var plaque = this.closest('.plaque');
-        var rivet = plaque.querySelector('.rivet-status');
-        if(ok){
-          if(rivet) rivet.classList.add('set');
-          this.classList.add('saved');
-          this.textContent = 'Gespeichert ✓';
-        } else {
-          this.classList.add('error');
-          this.textContent = '⚠ Fehler – nochmal';
-        }
-      };
-    });
-
-    var refreshBtn = document.getElementById('refreshTabelleBtn');
-    if(refreshBtn){
-      refreshBtn.onclick = function(){
-        this.classList.add('spinning');
-        refreshTabelle();
-      };
-    }
-    var refreshTippsBtn = document.getElementById('refreshTippsBtn');
-    if(refreshTippsBtn){
-      refreshTippsBtn.onclick = function(){
-        this.classList.add('spinning');
-        refreshTabelle();
-      };
-    }
-
-    document.querySelectorAll('[data-remove]').forEach(function(btn){
-      btn.onclick = function(){
-        var name = this.getAttribute('data-remove');
-        if(this.classList.contains('confirm-pending')){
-          clearTimeout(this._confirmTimer);
-          this.disabled = true;
-          this.textContent = 'Entfernt …';
-          removePlayer(name);
-        } else {
-          this.classList.add('confirm-pending');
-          this.textContent = 'Sicher? Nochmal klicken';
-          var self = this;
-          this._confirmTimer = setTimeout(function(){
-            self.classList.remove('confirm-pending');
-            self.textContent = 'ENTFERNEN';
-          }, 4000);
-        }
-      };
-    });
-
-    document.querySelectorAll('[data-save-res]').forEach(function(btn){
-      btn.onclick = function(){
-        var mid = this.getAttribute('data-save-res');
-        var plaque = this.closest('.res-plaque');
-        var hIn = plaque.querySelector('[data-res-side="h"]');
-        var aIn = plaque.querySelector('[data-res-side="a"]');
-        var h = parseInt(hIn.value,10), a = parseInt(aIn.value,10);
-        if(isNaN(h) || isNaN(a)){ hIn.focus(); return; }
-        saveResult(mid, h, a);
-      };
-    });
-
-    var saveSonderBtn = document.getElementById('saveSonderResBtn');
-    if(saveSonderBtn){
-      saveSonderBtn.onclick = function(){
-        var sel = document.getElementById('sonderResSelect');
-        var v = parseInt(sel.value, 10);
-        if(isNaN(v)){ sel.focus(); return; }
-        saveSonderErgebnis(v);
-      };
-    }
-    var saveSonderBtnHR = document.getElementById('saveSonderResHRBtn');
-    if(saveSonderBtnHR){
-      saveSonderBtnHR.onclick = function(){
-        var sel = document.getElementById('sonderResSelectHR');
-        var v = parseInt(sel.value, 10);
-        if(isNaN(v)){ sel.focus(); return; }
-        saveSonderErgebnisHR(v);
-      };
-    }
-    var saveSonderBtnTS = document.getElementById('saveSonderResTSBtn');
-    if(saveSonderBtnTS){
-      saveSonderBtnTS.onclick = function(){
-        var sel = document.getElementById('sonderResSelectTS');
-        if(sel.value === ''){ sel.focus(); return; }
-        saveSonderErgebnisTS(sel.value);
-      };
-    }
-  }
-
-  loadAll();
-})();
 </script>
 </body>
 </html>
