@@ -1,0 +1,95 @@
+name: Sync OpenLigaDB to Firebase
+
+on:
+  schedule:
+    # Läuft an Spieltagen (Fr, Sa, So) alle 30 Min. zwischen 15:00 und 22:30 UTC
+    - cron: "*/30 15-22 * * 5,6,0"
+    # Zusätzlich einmal täglich um 06:00 UTC für Nachholspiele / Spielplan-Updates
+    - cron: "0 6 * * *"
+  # Ermöglicht manuelles Starten über den "Run workflow"-Button in GitHub
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Firebase Admin SDK installieren
+        run: npm install firebase-admin
+
+      - name: OpenLigaDB abrufen und in Firebase speichern
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FIREBASE_DB_URL: "https://red-monkeys-tippspiel-default-rtdb.europe-west1.firebasedatabase.app"
+          OPENLIGA_URL: "https://api.openligadb.de/getmatchdata/bl1/2026/Union"
+        run: |
+          node -e '
+            const admin = require("firebase-admin");
+            const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+
+            admin.initializeApp({
+              credential: admin.credential.cert(serviceAccount),
+              databaseURL: process.env.FIREBASE_DB_URL
+            });
+
+            const db = admin.database();
+
+            async function run() {
+              const resp = await fetch(process.env.OPENLIGA_URL);
+              if (!resp.ok) throw new Error("OpenLigaDB HTTP " + resp.status);
+              const rawMatches = await resp.json();
+
+              if (!Array.isArray(rawMatches) || rawMatches.length === 0) {
+                throw new Error("Keine Spieldaten von OpenLigaDB erhalten.");
+              }
+
+              // Bestehende Ergebnisse laden (damit manuelle Admin-Korrekturen erhalten bleiben)
+              const existingSnap = await db.ref("tippspiel/results").once("value");
+              const mergedResults = existingSnap.val() || {};
+
+              const matchesMap = {};
+              let finishedCount = 0;
+
+              for (const m of rawMatches) {
+                const id = "ol_" + m.matchID;
+                const isoDate = m.matchDateTimeUTC || m.matchDateTime;
+
+                matchesMap[id] = {
+                  id,
+                  md: m.group?.groupOrderID || 0,
+                  date: isoDate,
+                  kickoffMs: new Date(isoDate).getTime(),
+                  home: m.team1?.teamName || "Heim",
+                  away: m.team2?.teamName || "Gast"
+                };
+
+                if (m.matchIsFinished && Array.isArray(m.matchResults)) {
+                  const finalRes = m.matchResults.find(r => r.resultTypeID === 2)
+                    || m.matchResults[m.matchResults.length - 1];
+                  if (finalRes && finalRes.pointsTeam1 !== null && finalRes.pointsTeam2 !== null) {
+                    mergedResults[id] = {
+                      home: Number(finalRes.pointsTeam1),
+                      away: Number(finalRes.pointsTeam2)
+                    };
+                    finishedCount++;
+                  }
+                }
+              }
+
+              await db.ref("tippspiel/matches").set(matchesMap);
+              await db.ref("tippspiel/results").set(mergedResults);
+              await db.ref("tippspiel/openligaLastSync").set(admin.database.ServerValue.TIMESTAMP);
+
+              console.log(`Sync OK: ${Object.keys(matchesMap).length} Spiele, ${finishedCount} Ergebnisse.`);
+              process.exit(0);
+            }
+
+            run().catch(err => {
+              console.error(err);
+              process.exit(1);
+            });
+          '
